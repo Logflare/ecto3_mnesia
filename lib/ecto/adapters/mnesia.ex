@@ -2,6 +2,7 @@ defmodule Ecto.Adapters.Mnesia do
   @behaviour Ecto.Adapter
   @behaviour Ecto.Adapter.Queryable
 
+  alias Ecto.Adapters.Mnesia
   alias Ecto.Adapters.Mnesia.Connection
 
   @impl Ecto.Adapter
@@ -24,10 +25,32 @@ defmodule Ecto.Adapters.Mnesia do
   end
 
   @impl Ecto.Adapter
-  def init(config) do
+  def init(_config) do
     {:ok, Connection.child_spec(), %{}}
   end
 
   @impl Ecto.Adapter
   def loaders(_primitive, type), do: [type]
+
+  @impl Ecto.Adapter.Queryable
+  def prepare(:all, query) do
+    {:nocache, Connection.all(query)}
+  end
+
+  @impl Ecto.Adapter.Queryable
+  def execute(
+    _adapter_meta,
+    _query_meta,
+    {:nocache,
+      %Mnesia.Query{table_name: table_name, match_spec: match_spec}
+    },
+    params,
+    _opts
+  ) do
+    {:atomic, result} = :mnesia.transaction(fn ->
+      # TODO reorder values according to schema ?
+      :mnesia.select(table_name, match_spec.(params))
+    end)
+    {length(result), result}
+  end
 end
