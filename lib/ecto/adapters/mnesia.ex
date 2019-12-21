@@ -6,7 +6,7 @@ defmodule Ecto.Adapters.Mnesia do
   alias Ecto.Adapters.Mnesia.Connection
 
   @impl Ecto.Adapter
-  def __before_compile__(_env), do: true
+  defmacro __before_compile__(_env), do: true
 
   @impl Ecto.Adapter
   def checkout(_adapter_meta, _config, function) do
@@ -52,5 +52,16 @@ defmodule Ecto.Adapters.Mnesia do
       :mnesia.select(table_name, match_spec.(params))
     end)
     {length(result), result}
+  end
+
+  @impl Ecto.Adapter.Queryable
+  def stream(
+    _adapter_meta,
+    _query_meta,
+    _query,
+    _params,
+    _opts
+  ) do
+    raise "Not implemented"
   end
 end

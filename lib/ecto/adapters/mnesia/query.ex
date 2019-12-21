@@ -4,6 +4,12 @@ defmodule Ecto.Adapters.Mnesia.Query do
 
   defstruct table_name: nil, match_spec: nil
 
+  @type t :: %__MODULE__{
+    table_name: atom(),
+    match_spec: (params :: list() -> :ets.match_spec())
+  }
+
+  @spec from_ecto_query(ecto_query :: Ecto.Query.t()) :: mnesia_query :: t()
   def from_ecto_query(%Ecto.Query{sources: sources, wheres: wheres}) do
     {{table_name, schema, _}} = sources
     table_name = String.to_atom(table_name)

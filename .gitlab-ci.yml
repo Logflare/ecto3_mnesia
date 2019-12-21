@@ -17,3 +17,20 @@ test:
   - mix test --trace
   variables:
     MIX_ENV: test
+
+dialyzer:
+  stage: test
+  image: elixir:1.9.4-alpine
+  cache:
+    key: ${CI_COMMIT_REF_SLUG}
+    paths:
+    - _build/
+  before_script:
+  - apk --update add git make g++
+  - mix local.hex --force
+  - mix local.rebar --force
+  - mix deps.get
+  script:
+  - mix dialyzer
+  variables:
+    MIX_ENV: dev
