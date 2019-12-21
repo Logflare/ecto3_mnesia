@@ -58,10 +58,16 @@ defmodule Ecto.Adapters.Mnesia do
   def stream(
     _adapter_meta,
     _query_meta,
-    _query,
-    _params,
+    {:nocache,
+      %Mnesia.Query{table_name: table_name, match_spec: match_spec}
+    },
+    params,
     _opts
   ) do
-    raise "Not implemented"
+    {:atomic, result} = :mnesia.transaction(fn ->
+      # TODO reorder values according to schema ?
+      :mnesia.select(table_name, match_spec.(params))
+    end)
+    result
   end
 end
