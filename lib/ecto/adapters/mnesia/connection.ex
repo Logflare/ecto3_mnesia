@@ -23,7 +23,7 @@ defmodule Ecto.Adapters.Mnesia.Connection do
     }
   end
 
-  def all(%Ecto.Query{} = query) do
-    Mnesia.Query.from_ecto_query(query)
+  def all(type, %Ecto.Query{} = query) do
+    Mnesia.Query.from_ecto_query(type, query)
   end
 end
