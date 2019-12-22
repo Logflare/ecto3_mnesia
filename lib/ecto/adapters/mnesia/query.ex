@@ -9,13 +9,13 @@ defmodule Ecto.Adapters.Mnesia.Query do
   defstruct type: nil, table_name: nil, match_spec: nil, new_record: nil
 
   @type t :: %__MODULE__{
-    type: :all | :update_all,
+    type: :all | :update_all | :delete_all,
     table_name: atom(),
     match_spec: (params :: list() -> :ets.match_spec()),
     new_record: (tuple(), list() -> tuple())
   }
 
-  @spec from_ecto_query(type :: :all | :update_all, ecto_query :: Ecto.Query.t()) :: mnesia_query :: t()
+  @spec from_ecto_query(type :: :all | :update_all | :delete_all, ecto_query :: Ecto.Query.t()) :: mnesia_query :: t()
   def from_ecto_query(
     type,
     %Ecto.Query{sources: sources, wheres: wheres, updates: updates}

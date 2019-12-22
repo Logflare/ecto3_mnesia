@@ -86,6 +86,30 @@ defmodule Ecto.Adapters.Mnesia do
     end
   end
 
+  def execute(
+    _adapter_meta,
+    _query_meta,
+    {:nocache,
+      %Mnesia.Query{
+        type: :delete_all,
+        table_name: table_name,
+        match_spec: match_spec
+      }
+    },
+    params,
+    _opts
+  ) do
+    case :mnesia.transaction(fn ->
+      :mnesia.select(table_name, match_spec.(params))
+      |> Enum.map(fn (record) ->
+        :mnesia.delete(table_name, List.first(record), :write)
+      end)
+    end) do
+      {:atomic, result} -> {length(result), nil}
+      {:aborted, e} -> {0, e}
+    end
+  end
+
   @impl Ecto.Adapter.Queryable
   def stream(
     _adapter_meta,
