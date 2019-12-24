@@ -22,6 +22,8 @@ erl_crash.dump
 # Ignore package tarball (built via "mix hex.build").
 ecto_mnesia-*.tar
 
+# Mnesia files
+/Mnesia.nonode@nohost
 
 # Vim files
 *.swp

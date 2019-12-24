@@ -1,5 +1,6 @@
 defmodule Ecto.Adapters.Mnesia.Query do
   import Ecto.Adapters.Mnesia.Table, only: [
+    attribute_index: 2,
     field_index: 2
   ]
 
@@ -45,10 +46,9 @@ defmodule Ecto.Adapters.Mnesia.Query do
         [%QueryExpr{expr: [set: replacements]}] ->
           replacements
           |> Enum.reduce(record, fn ({field, {:^, [], [param_index]}}, record) ->
-            field_index = field_index(field, table_name)
+            attribute_index = attribute_index(field, table_name)
             value = Enum.at(params, param_index)
-
-            List.replace_at(record, field_index, value)
+            List.replace_at(record, attribute_index, value)
           end)
           |> List.insert_at(0, schema)
           |> List.to_tuple()

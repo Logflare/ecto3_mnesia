@@ -64,7 +64,7 @@ defmodule Ecto.Adapters.Mnesia.MatchSpec do
   ) when is_list(values) do
     index = field_index(field, context[:table_name])
     Enum.map(values, fn (value) ->
-      {:==, :"$#{index + 1}", value}
+      {:==, :"$#{index}", value}
     end)
     |> List.insert_at(0, :or)
     |> List.to_tuple()
@@ -81,6 +81,6 @@ defmodule Ecto.Adapters.Mnesia.MatchSpec do
     context
   ) do
     index = field_index(field, context[:table_name])
-    {op, :"$#{index + 1}", value}
+    {op, :"$#{index}", value}
   end
 end

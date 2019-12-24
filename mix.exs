@@ -8,6 +8,7 @@ defmodule EctoMnesia.MixProject do
       elixir: "~> 1.9",
       start_permanent: Mix.env() == :prod,
       deps: deps(),
+      elixirc_paths: elixirc_paths(Mix.env),
       dialyzer: [
         plt_add_apps: [:mnesia],
       ]
@@ -19,6 +20,9 @@ defmodule EctoMnesia.MixProject do
       extra_applications: [:logger]
     ]
   end
+
+  defp elixirc_paths(:test), do: ["lib", "test/support"]
+  defp elixirc_paths(_), do: ["lib"]
 
   defp deps do
     [

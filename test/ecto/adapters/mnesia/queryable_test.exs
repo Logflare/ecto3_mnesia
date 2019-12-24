@@ -5,10 +5,12 @@ defmodule Ecto.Adapters.MnesiaQueryableIntegrationTest do
   alias EctoMnesia.TestRepo
   alias Ecto.Adapters.Mnesia
 
+  @table_name __MODULE__.Table
+
   defmodule TestSchema do
     use Ecto.Schema
 
-    schema "test_schema" do
+    schema "#{Ecto.Adapters.MnesiaQueryableIntegrationTest.Table}" do
       field :field, :string
     end
   end
@@ -17,7 +19,7 @@ defmodule Ecto.Adapters.MnesiaQueryableIntegrationTest do
     Mnesia.ensure_all_started([], :permanent)
     {:ok, _repo} = TestRepo.start_link()
 
-    :mnesia.create_table(:test_schema, [
+    :mnesia.create_table(@table_name, [
       ram_copies: [node()],
       record_name: TestSchema,
       attributes: [:id, :field],
@@ -41,7 +43,7 @@ defmodule Ecto.Adapters.MnesiaQueryableIntegrationTest do
       ]
       {:atomic, _result} = :mnesia.transaction(fn ->
         Enum.map(records, fn (%{id: id, field: field}) ->
-          :mnesia.write(:test_schema, {TestSchema, id, field}, :write)
+          :mnesia.write(@table_name, {TestSchema, id, field}, :write)
         end)
       end)
 
@@ -58,7 +60,7 @@ defmodule Ecto.Adapters.MnesiaQueryableIntegrationTest do
           end)
       end
 
-      :mnesia.clear_table(:test_schema)
+      :mnesia.clear_table(@table_name)
     end
 
     test "#all from one table with basic select query, records" do
@@ -68,7 +70,7 @@ defmodule Ecto.Adapters.MnesiaQueryableIntegrationTest do
       ]
       {:atomic, _result} = :mnesia.transaction(fn ->
         Enum.map(records, fn (%{id: id, field: field}) ->
-          :mnesia.write(:test_schema, {TestSchema, id, field}, :write)
+          :mnesia.write(@table_name, {TestSchema, id, field}, :write)
         end)
       end)
 
@@ -76,7 +78,7 @@ defmodule Ecto.Adapters.MnesiaQueryableIntegrationTest do
         from(s in TestSchema, select: s.id)
       ) == Enum.map(records, fn (%{id: id}) -> id end)
 
-      :mnesia.clear_table(:test_schema)
+      :mnesia.clear_table(@table_name)
     end
 
     test "#all from one table with multiple field select query, records" do
@@ -86,7 +88,7 @@ defmodule Ecto.Adapters.MnesiaQueryableIntegrationTest do
       ]
       {:atomic, _result} = :mnesia.transaction(fn ->
         Enum.map(records, fn (%{id: id, field: field}) ->
-          :mnesia.write(:test_schema, {TestSchema, id, field}, :write)
+          :mnesia.write(@table_name, {TestSchema, id, field}, :write)
         end)
       end)
 
@@ -94,7 +96,7 @@ defmodule Ecto.Adapters.MnesiaQueryableIntegrationTest do
         from(s in TestSchema, select: [s.id, s.field])
       ) == Enum.map(records, fn (%{id: id, field: field}) -> [id, field] end)
 
-      :mnesia.clear_table(:test_schema)
+      :mnesia.clear_table(@table_name)
     end
 
     test "#all from one table with simple where query, records" do
@@ -104,7 +106,7 @@ defmodule Ecto.Adapters.MnesiaQueryableIntegrationTest do
       ]
       {:atomic, _result} = :mnesia.transaction(fn ->
         Enum.map(records, fn (%{id: id, field: field}) ->
-          :mnesia.write(:test_schema, {TestSchema, id, field}, :write)
+          :mnesia.write(@table_name, {TestSchema, id, field}, :write)
         end)
       end)
 
@@ -115,17 +117,17 @@ defmodule Ecto.Adapters.MnesiaQueryableIntegrationTest do
         e -> assert e == false
       end
 
-      :mnesia.clear_table(:test_schema)
+      :mnesia.clear_table(@table_name)
     end
 
     test "#all from one table with simple where query, many records" do
       {:atomic, _result} = :mnesia.transaction(fn ->
-        :mnesia.write(:test_schema, {TestSchema, 1, "field"}, :write)
+        :mnesia.write(@table_name, {TestSchema, 1, "field"}, :write)
 
         Stream.iterate(0, &(&1 + 1))
         |> Enum.take(10_000)
         |> Enum.map(fn (id) ->
-          :mnesia.write(:test_schema, {TestSchema, id, "field #{id}"}, :write)
+          :mnesia.write(@table_name, {TestSchema, id, "field #{id}"}, :write)
         end)
       end)
 
@@ -138,7 +140,7 @@ defmodule Ecto.Adapters.MnesiaQueryableIntegrationTest do
       end)
       assert time < 50_000
 
-      :mnesia.clear_table(:test_schema)
+      :mnesia.clear_table(@table_name)
     end
 
     test "#all from one table with complex (and) where query, records" do
@@ -148,7 +150,7 @@ defmodule Ecto.Adapters.MnesiaQueryableIntegrationTest do
       ]
       {:atomic, _result} = :mnesia.transaction(fn ->
         Enum.map(records, fn (%{id: id, field: field}) ->
-          :mnesia.write(:test_schema, {TestSchema, id, field}, :write)
+          :mnesia.write(@table_name, {TestSchema, id, field}, :write)
         end)
       end)
 
@@ -161,7 +163,7 @@ defmodule Ecto.Adapters.MnesiaQueryableIntegrationTest do
         _ -> false
       end)
 
-      :mnesia.clear_table(:test_schema)
+      :mnesia.clear_table(@table_name)
     end
 
     test "#all from one table with complex (or) where query, records" do
@@ -171,7 +173,7 @@ defmodule Ecto.Adapters.MnesiaQueryableIntegrationTest do
       ]
       {:atomic, _result} = :mnesia.transaction(fn ->
         Enum.map(records, fn (%{id: id, field: field}) ->
-          :mnesia.write(:test_schema, {TestSchema, id, field}, :write)
+          :mnesia.write(@table_name, {TestSchema, id, field}, :write)
         end)
       end)
 
@@ -185,7 +187,7 @@ defmodule Ecto.Adapters.MnesiaQueryableIntegrationTest do
         _ -> false
       end)
 
-      :mnesia.clear_table(:test_schema)
+      :mnesia.clear_table(@table_name)
     end
 
     test "#all from one table with complex (mixed and / or) where query, records" do
@@ -195,7 +197,7 @@ defmodule Ecto.Adapters.MnesiaQueryableIntegrationTest do
       ]
       {:atomic, _result} = :mnesia.transaction(fn ->
         Enum.map(records, fn (%{id: id, field: field}) ->
-          :mnesia.write(:test_schema, {TestSchema, id, field}, :write)
+          :mnesia.write(@table_name, {TestSchema, id, field}, :write)
         end)
       end)
 
@@ -209,7 +211,7 @@ defmodule Ecto.Adapters.MnesiaQueryableIntegrationTest do
         _ -> false
       end)
 
-      :mnesia.clear_table(:test_schema)
+      :mnesia.clear_table(@table_name)
     end
 
     test "#all from one table with complex (is_nil) where query, records" do
@@ -219,7 +221,7 @@ defmodule Ecto.Adapters.MnesiaQueryableIntegrationTest do
       ]
       {:atomic, _result} = :mnesia.transaction(fn ->
         Enum.map(records, fn (%{id: id, field: field}) ->
-          :mnesia.write(:test_schema, {TestSchema, id, field}, :write)
+          :mnesia.write(@table_name, {TestSchema, id, field}, :write)
         end)
       end)
 
@@ -231,7 +233,7 @@ defmodule Ecto.Adapters.MnesiaQueryableIntegrationTest do
         _ -> false
       end)
 
-      :mnesia.clear_table(:test_schema)
+      :mnesia.clear_table(@table_name)
     end
 
     test "#all from one table with complex (binding) where query, records" do
@@ -243,7 +245,7 @@ defmodule Ecto.Adapters.MnesiaQueryableIntegrationTest do
       ]
       {:atomic, _result} = :mnesia.transaction(fn ->
         Enum.map(records, fn (%{id: id, field: field}) ->
-          :mnesia.write(:test_schema, {TestSchema, id, field}, :write)
+          :mnesia.write(@table_name, {TestSchema, id, field}, :write)
         end)
       end)
 
@@ -255,7 +257,7 @@ defmodule Ecto.Adapters.MnesiaQueryableIntegrationTest do
         _ -> false
       end)
 
-      :mnesia.clear_table(:test_schema)
+      :mnesia.clear_table(@table_name)
     end
 
     test "#all from one table with complex (in) where query, records" do
@@ -266,7 +268,7 @@ defmodule Ecto.Adapters.MnesiaQueryableIntegrationTest do
       ]
       {:atomic, _result} = :mnesia.transaction(fn ->
         Enum.map(records, fn (%{id: id, field: field}) ->
-          :mnesia.write(:test_schema, {TestSchema, id, field}, :write)
+          :mnesia.write(@table_name, {TestSchema, id, field}, :write)
         end)
       end)
 
@@ -281,7 +283,7 @@ defmodule Ecto.Adapters.MnesiaQueryableIntegrationTest do
         e -> assert e == false
       end
 
-      :mnesia.clear_table(:test_schema)
+      :mnesia.clear_table(@table_name)
     end
 
     test "#all from one table with complex (in / binding) where query, records" do
@@ -292,7 +294,7 @@ defmodule Ecto.Adapters.MnesiaQueryableIntegrationTest do
       ]
       {:atomic, _result} = :mnesia.transaction(fn ->
         Enum.map(records, fn (%{id: id, field: field}) ->
-          :mnesia.write(:test_schema, {TestSchema, id, field}, :write)
+          :mnesia.write(@table_name, {TestSchema, id, field}, :write)
         end)
       end)
 
@@ -309,7 +311,7 @@ defmodule Ecto.Adapters.MnesiaQueryableIntegrationTest do
         e -> assert e == false
       end
 
-      :mnesia.clear_table(:test_schema)
+      :mnesia.clear_table(@table_name)
     end
 
     test "#update_all from one table with simple where query, records" do
@@ -320,7 +322,7 @@ defmodule Ecto.Adapters.MnesiaQueryableIntegrationTest do
       ]
       {:atomic, _result} = :mnesia.transaction(fn ->
         Enum.map(records, fn (%{id: id, field: field}) ->
-          :mnesia.write(:test_schema, {TestSchema, id, field}, :write)
+          :mnesia.write(@table_name, {TestSchema, id, field}, :write)
         end)
       end)
 
@@ -337,7 +339,7 @@ defmodule Ecto.Adapters.MnesiaQueryableIntegrationTest do
         e -> assert e == false
       end
 
-      :mnesia.clear_table(:test_schema)
+      :mnesia.clear_table(@table_name)
     end
 
     test "#delete_all from one table with simple where query, records" do
@@ -348,7 +350,7 @@ defmodule Ecto.Adapters.MnesiaQueryableIntegrationTest do
       ]
       {:atomic, _result} = :mnesia.transaction(fn ->
         Enum.map(records, fn (%{id: id, field: field}) ->
-          :mnesia.write(:test_schema, {TestSchema, id, field}, :write)
+          :mnesia.write(@table_name, {TestSchema, id, field}, :write)
         end)
       end)
 
@@ -358,14 +360,14 @@ defmodule Ecto.Adapters.MnesiaQueryableIntegrationTest do
         {count, nil} ->
           assert count == 2
           case :mnesia.transaction(fn ->
-            :mnesia.foldl(fn (record, acc) -> [record|acc] end, [], :test_schema)
+            :mnesia.foldl(fn (record, acc) -> [record|acc] end, [], @table_name)
           end) do
             {:atomic, [{_, 3, "field 3"}]} -> assert true
             _ -> assert false
           end
       end
 
-      :mnesia.clear_table(:test_schema)
+      :mnesia.clear_table(@table_name)
     end
   end
 end
