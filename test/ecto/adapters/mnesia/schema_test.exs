@@ -38,6 +38,7 @@ defmodule Ecto.Adapters.Mnesia.SchemaIntegrationTest do
           {:atomic, [result]} = :mnesia.transaction(fn ->
             :mnesia.read(@table_name, id)
           end)
+
           {TestSchema, ^id, field, _, _} = result
           assert field == "field"
         _ -> assert false
@@ -55,6 +56,61 @@ defmodule Ecto.Adapters.Mnesia.SchemaIntegrationTest do
           end)
           {TestSchema, ^id, field, _, _} = result
           assert field == "field"
+        _ -> assert false
+      end
+
+      :mnesia.clear_table(@table_name)
+    end
+  end
+
+  describe "Ecto.Adapters.Schema#insert_all" do
+    test "Repo#insert_all valid records with [on_conflict: :replace_all]" do
+      case TestRepo.insert_all(
+        TestSchema,
+        [%{field: "field 1"}, %{field: "field 2"}],
+        on_conflict: :replace_all,
+        returning: [:id]
+      ) do
+        {:ok, records} ->
+          assert true
+          {:atomic, results} = :mnesia.transaction(fn ->
+            :mnesia.foldl(fn (record, acc) -> [record|acc] end, [], @table_name)
+          end)
+
+          assert length(results) == 2
+          assert Enum.all?(results, fn
+            ({TestSchema, _, "field 1", _, _}) -> true
+            ({TestSchema, _, "field 2", _, _}) -> true
+            (_) -> false
+          end)
+        _ -> assert false
+      end
+
+      :mnesia.clear_table(@table_name)
+    end
+
+    # NOTE the returning opt is mendatory in Repo#insert_all in order to return created records
+    test "Repo#insert_all valid records with [on_conflict: :replace_all] and returning opt" do
+      case TestRepo.insert_all(
+        TestSchema,
+        [%{field: "field 1"}, %{field: "field 2"}],
+        on_conflict: :replace_all,
+        returning: [:id]
+      ) do
+        {:ok, records} ->
+          assert true
+          {:atomic, results} = :mnesia.transaction(fn ->
+            Enum.map(records, fn (%{id: id}) ->
+              :mnesia.read(@table_name, id)
+            end)
+          end)
+
+          assert length(results) == 2
+          assert Enum.all?(results, fn
+            ([{TestSchema, _, "field 1", _, _}]) -> true
+            ([{TestSchema, _, "field 2", _, _}]) -> true
+            (_) -> false
+          end)
         _ -> assert false
       end
 

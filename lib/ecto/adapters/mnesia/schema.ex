@@ -30,7 +30,19 @@ defmodule Ecto.Adapters.Mnesia.Schema do
       (^key) ->
         params[key] ||
           Mnesia.autogenerate(type)
-      (attribute) -> with {:ok, value} <- Keyword.fetch(params, attribute), do: value
+      (:inserted_at) ->
+        params[:inserted_at] ||
+          # TODO Repo#insert_all do not set timestamps, pickup Repo timestamps configuration
+          NaiveDateTime.utc_now()
+      (:updated_at) ->
+        params[:updated_at] ||
+          # TODO Repo#insert_all do not set timestamps, pickup Repo timestamps configuration
+          NaiveDateTime.utc_now()
+      (attribute) ->
+        case Keyword.fetch(params, attribute) do
+          {:ok, value} -> value
+          :error -> nil
+        end
     end)
     |> List.insert_at(0, schema)
     |> List.to_tuple()

@@ -45,7 +45,7 @@ defmodule Ecto.Adapters.Mnesia do
   end
   defp ensure_id_seq_table(nodes) when is_list(nodes) do
     case :mnesia.create_table(@id_seq_table_name, [
-      ram_copies: nodes,
+      disc_copies: nodes,
       attributes: [:id, :_dummy],
       type: :ordered_set
     ]) do
@@ -156,10 +156,8 @@ defmodule Ecto.Adapters.Mnesia do
 
   @impl Ecto.Adapter.Schema
   def autogenerate(:id) do
-    id = :mnesia.dirty_update_counter({@id_seq_table_name, :id}, 1)
-    # NOTE: dump_tables may be a bottleneck, need to check in production
-    spawn(fn -> :mnesia.dump_tables([@id_seq_table_name]) end)
-    id
+    # NOTE it may take a while to flush the counter state to the disc
+    :mnesia.dirty_update_counter({@id_seq_table_name, :id}, 1)
   end
   def autogenerate(:embed_id), do: Ecto.UUID.generate()
   def autogenerate(:binary_id), do: Ecto.UUID.bingenerate()
@@ -195,6 +193,48 @@ defmodule Ecto.Adapters.Mnesia do
         result = returning
         |> Enum.map(fn (attribute) ->
           {attribute, elem(record, field_index(attribute, table_name))}
+        end)
+        {:ok, result}
+      {:aborted, error} ->
+        {:invalid, [mnesia: "#{inspect(error)}"]}
+    end
+  end
+
+  @impl Ecto.Adapter.Schema
+  def insert_all(
+    adapter_meta,
+    %{schema: schema, source: source, autogenerate_id: autogenerate_id},
+    _header,
+    records,
+    _on_conflict,
+    returning,
+    opts
+  ) do
+    if opts[:on_conflict] != :replace_all do
+      # TODO manage others `on_conflict` configurations
+      raise "only [on_conflict: :replace_all] is supported by the adapter"
+    end
+
+    table_name = String.to_atom(source)
+    context = [
+      table_name: table_name,
+      schema: schema,
+      autogenerate_id: autogenerate_id
+    ]
+
+    case :mnesia.transaction(fn ->
+      Enum.map(records, fn (params) ->
+        record = Schema.build_record(params, context)
+        id = elem(record, 1)
+        :mnesia.write(table_name, record, :write)
+        :mnesia.read(table_name, id)
+      end)
+    end) do
+      {:atomic, created_records} ->
+        result = Enum.map(created_records, fn ([record]) ->
+          Enum.map(returning, fn (attribute) ->
+            elem(record, field_index(attribute, table_name))
+          end)
         end)
         {:ok, result}
       {:aborted, error} ->
