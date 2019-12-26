@@ -5,18 +5,28 @@ defmodule Ecto.Adapters.Mnesia.MatchSpec do
 
   alias Ecto.Query.BooleanExpr
 
-  @type t :: (params :: list() -> :ets.match_spec())
+  @type t :: (list(%BooleanExpr{}) | Keyword.t() -> (params :: list() -> :ets.match_spec()))
 
   @spec build(
-    {table_name :: atom(), schema :: struct()},
-    wheres :: list(%Ecto.Query.BooleanExpr{})
-  ) :: (params :: list() -> :ets.match_spec())
-  def build({table_name, schema}, wheres) do
+    {table_name :: atom(), schema :: struct()}
+  ) :: (list(%BooleanExpr{}) | Keyword.t() -> (params :: list() -> :ets.match_spec()))
+  def build({table_name, schema}) do
     head = head(table_name, schema)
-    guards = guards(table_name, wheres)
     result = result()
 
-    fn (params) -> [{head, guards.(params), result}] end
+    fn
+      ([%BooleanExpr{}|_t] = wheres) ->
+        guards = guards(table_name, wheres)
+
+        fn (params) -> [{head, guards.(params), result}] end
+      ([{_k, _v}|_t] = filters) ->
+        guards = Enum.map(filters, fn ({key, value}) ->
+          index = field_index(key, table_name)
+          {:==, :"$#{index}", value}
+        end)
+        fn (_) -> [{head, guards, result}] end
+      ([]) -> fn (_) -> [{head, [], result}] end
+    end
   end
 
   defp head(table_name, schema) do

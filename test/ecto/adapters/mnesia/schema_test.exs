@@ -14,6 +14,11 @@ defmodule Ecto.Adapters.Mnesia.SchemaIntegrationTest do
 
       timestamps()
     end
+
+    def changeset(%TestSchema{} = struct, params) do
+      struct
+      |> Ecto.Changeset.cast(params, [:field])
+    end
   end
 
   setup_all do
@@ -71,7 +76,7 @@ defmodule Ecto.Adapters.Mnesia.SchemaIntegrationTest do
         on_conflict: :replace_all,
         returning: [:id]
       ) do
-        {:ok, records} ->
+        {:ok, _records} ->
           assert true
           {:atomic, results} = :mnesia.transaction(fn ->
             :mnesia.foldl(fn (record, acc) -> [record|acc] end, [], @table_name)
@@ -112,6 +117,43 @@ defmodule Ecto.Adapters.Mnesia.SchemaIntegrationTest do
             (_) -> false
           end)
         _ -> assert false
+      end
+
+      :mnesia.clear_table(@table_name)
+    end
+  end
+
+  describe "Ecto.Adapters.Schema#update" do
+    setup do
+      {:atomic, _} = :mnesia.transaction(fn ->
+        :mnesia.write(@table_name, {TestSchema, 1, "field", nil, nil}, :write)
+      end)
+      record = TestRepo.get(TestSchema, 1)
+      {:ok, record: record}
+    end
+
+    test "Repo#update valid record with [on_conflict: :replace_all]", %{record: record} do
+      changeset = TestSchema.changeset(record, %{field: "field updated"})
+
+      case TestRepo.update(changeset) do
+        {:ok, %TestSchema{id: 1, field: "field updated"}} -> assert true
+        _ -> assert false
+      end
+
+      case :mnesia.transaction(fn ->
+        :mnesia.read(@table_name, 1)
+      end) do
+        {:atomic, [{TestSchema, 1, "field updated", _, _}]} -> assert true
+        _ -> assert false
+      end
+      :mnesia.clear_table(@table_name)
+    end
+
+    test "Repo#update non existing record with [on_conflict: :replace_all]", %{record: record} do
+      changeset = TestSchema.changeset(%{record|id: 3}, %{field: "field updated"})
+
+      assert_raise Ecto.StaleEntryError, fn ->
+        TestRepo.update(changeset)
       end
 
       :mnesia.clear_table(@table_name)

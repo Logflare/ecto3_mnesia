@@ -1,9 +1,9 @@
 defmodule Ecto.Adapters.Mnesia.Table do
-  @spec attribute_index(
+  @spec record_field_index(
     attribute :: atom(),
     table_name :: atom()
-  ) :: index :: integer()
-  def attribute_index(attribute, table_name) do
+  ) :: field_index :: integer()
+  def record_field_index(attribute, table_name) do
     Enum.find_index(
       attributes(table_name),
       fn (e) -> e == attribute end
@@ -13,9 +13,17 @@ defmodule Ecto.Adapters.Mnesia.Table do
   @spec field_index(
     field :: atom(),
     table_name :: atom()
-  ) :: index :: integer()
+  ) :: field_index :: integer()
   def field_index(field, table_name) do
-    attribute_index(field, table_name) + 1
+    record_field_index(field, table_name) + 1
+  end
+
+  @spec field_name(
+    index :: integer(),
+    table_name :: atom()
+  ) :: field_name :: atom()
+  def field_name(index, table_name) do
+    Enum.at(attributes(table_name), index)
   end
 
   @spec attributes(table_name :: atom()) :: attributes :: list(atom())

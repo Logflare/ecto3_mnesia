@@ -5,7 +5,7 @@ defmodule Ecto.Adapters.Mnesia do
 
   import Ecto.Adapters.Mnesia.Table, only: [
     field_index: 2,
-    attributes: 1
+    field_name: 2
   ]
 
   alias Ecto.Adapters.Mnesia
@@ -85,6 +85,7 @@ defmodule Ecto.Adapters.Mnesia do
     end)
     {length(result), result}
   end
+
   def execute(
     _adapter_meta,
     _query_meta,
@@ -164,7 +165,7 @@ defmodule Ecto.Adapters.Mnesia do
 
   @impl Ecto.Adapter.Schema
   def insert(
-    adapter_meta,
+    _adapter_meta,
     %{schema: schema, source: source, autogenerate_id: autogenerate_id},
     params,
     _on_conflict,
@@ -202,7 +203,7 @@ defmodule Ecto.Adapters.Mnesia do
 
   @impl Ecto.Adapter.Schema
   def insert_all(
-    adapter_meta,
+    _adapter_meta,
     %{schema: schema, source: source, autogenerate_id: autogenerate_id},
     _header,
     records,
@@ -239,6 +240,47 @@ defmodule Ecto.Adapters.Mnesia do
         {:ok, result}
       {:aborted, error} ->
         {:invalid, [mnesia: "#{inspect(error)}"]}
+    end
+  end
+
+  @impl Ecto.Adapter.Schema
+  def update(
+    _adapter_meta,
+    %{schema: schema, source: source},
+    fields,
+    filters,
+    returning,
+    _opts
+  ) do
+    table_name = String.to_atom(source)
+
+    match_spec = Mnesia.MatchSpec.build({table_name, schema}).(filters)
+    with {:atomic, [record]} <- :mnesia.transaction(fn ->
+      :mnesia.select(table_name, match_spec.([]))
+    end),
+      {:atomic, update} <- :mnesia.transaction(fn ->
+          update = record
+                   |> Enum.with_index()
+                   |> Enum.map(fn ({attribute, index}) ->
+                     case Keyword.fetch(fields, field_name(index, table_name)) do
+                       {:ok, value} -> value
+                       :error -> attribute
+                     end
+                   end)
+                   |> List.insert_at(0, schema)
+                   |> List.to_tuple()
+
+          :mnesia.write(table_name, update, :write)
+          update
+        end) do
+            result = returning
+                     |> Enum.map(fn (attribute) ->
+                       {attribute, elem(update, field_index(attribute, table_name))}
+                     end)
+            {:ok, result}
+    else
+      {:atomic, []} -> {:error, :stale}
+      {:aborted, error} -> {:invalid, [mnesia: "#{inspect(error)}"]}
     end
   end
 end
