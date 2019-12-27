@@ -146,6 +146,7 @@ defmodule Ecto.Adapters.Mnesia.SchemaIntegrationTest do
         {:atomic, [{TestSchema, 1, "field updated", _, _}]} -> assert true
         _ -> assert false
       end
+
       :mnesia.clear_table(@table_name)
     end
 
@@ -154,6 +155,39 @@ defmodule Ecto.Adapters.Mnesia.SchemaIntegrationTest do
 
       assert_raise Ecto.StaleEntryError, fn ->
         TestRepo.update(changeset)
+      end
+
+      :mnesia.clear_table(@table_name)
+    end
+  end
+
+  describe "Ecto.Adapters.Schema#delete" do
+    setup do
+      {:atomic, _} = :mnesia.transaction(fn ->
+        :mnesia.write(@table_name, {TestSchema, 1, "field", nil, nil}, :write)
+      end)
+      record = TestRepo.get(TestSchema, 1)
+      {:ok, record: record}
+    end
+
+    test "Repo#delete an existing record", %{record: record} do
+      case TestRepo.delete(record) do
+        {:ok, %TestSchema{id: 1, field: "field"}} ->
+          case :mnesia.transaction(fn ->
+            :mnesia.read(@table_name, 1)
+          end) do
+            {:atomic, []} -> assert true
+            _ -> assert false
+          end
+        _ -> assert false
+      end
+
+      :mnesia.clear_table(@table_name)
+    end
+
+    test "Repo#delete a non existing record", %{record: record} do
+      assert_raise Ecto.StaleEntryError, fn ->
+        TestRepo.delete(%{record|id: 2})
       end
 
       :mnesia.clear_table(@table_name)

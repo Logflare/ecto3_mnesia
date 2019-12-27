@@ -283,4 +283,27 @@ defmodule Ecto.Adapters.Mnesia do
       {:aborted, error} -> {:invalid, [mnesia: "#{inspect(error)}"]}
     end
   end
+
+  @impl Ecto.Adapter.Schema
+  def delete(
+    _adapter_meta,
+    %{schema: schema, source: source},
+    filters,
+    _opts
+  ) do
+    table_name = String.to_atom(source)
+
+    match_spec = Mnesia.MatchSpec.build({table_name, schema}).(filters)
+    with {:atomic, [[id|_t]]} <- :mnesia.transaction(fn ->
+      :mnesia.select(table_name, match_spec.([]))
+    end),
+      {:atomic, :ok} <- :mnesia.transaction(fn ->
+          :mnesia.delete(table_name, id, :write)
+        end) do
+      {:ok, []}
+    else
+      {:atomic, []} -> {:error, :stale}
+      {:aborted, error} -> {:invalid, [mnesia: "#{inspect(error)}"]}
+    end
+  end
 end
