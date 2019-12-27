@@ -1,6 +1,7 @@
 defmodule Ecto.Adapters.Mnesia.Connection do
   use Supervisor
 
+  alias Ecto.Adapters.Mnesia
   alias Ecto.Adapters.Mnesia.Connection
 
   def start_link() do
@@ -20,5 +21,9 @@ defmodule Ecto.Adapters.Mnesia.Connection do
       start: {Connection, :start_link, []},
       type: :supervisor
     }
+  end
+
+  def all(type, %Ecto.Query{} = query) do
+    Mnesia.Query.from_ecto_query(type, query)
   end
 end

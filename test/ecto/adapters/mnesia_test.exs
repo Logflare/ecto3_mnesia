@@ -1,25 +1,19 @@
-defmodule Ecto.Adapters.MnesiaTest do
+defmodule Ecto.Adapters.MnesiaAdapterIntegrationTest do
   use ExUnit.Case, async: true
 
   alias EctoMnesia.TestRepo
   alias Ecto.Adapters.Mnesia
-  alias Ecto.Adapters.Mnesia.Connection
-
-  defmodule TestSchema do
-    use Ecto.Schema
-
-    schema "test_schema" do
-      field :field, :string
-    end
-  end
 
   setup do
     Mnesia.ensure_all_started([], :permanent)
+    :ok
   end
 
-  test "#start_link" do
-    {:ok, repo} = TestRepo.start_link()
+  describe "Ecto.Adapter#init" do
+    test "#start_link" do
+      {:ok, repo} = TestRepo.start_link()
 
-    assert Process.alive?(repo)
+      assert Process.alive?(repo)
+    end
   end
 end
