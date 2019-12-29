@@ -11,6 +11,7 @@ defmodule Ecto.Adapters.Mnesia.SchemaIntegrationTest do
 
     schema "#{Ecto.Adapters.Mnesia.SchemaIntegrationTest.Table}" do
       timestamps()
+
       field :field, :string
     end
 

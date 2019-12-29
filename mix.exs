@@ -22,7 +22,7 @@ defmodule EctoMnesia.MixProject do
 
   defp deps do
     [
-      {:ecto, "~> 3.3"},
+      {:ecto, "~> 3.0"},
       {:dialyxir, "~> 1.0.0-rc.7", only: [:dev], runtime: false}
     ]
   end
