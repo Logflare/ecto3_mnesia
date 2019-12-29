@@ -4,13 +4,13 @@ defmodule Ecto.Adapters.Mnesia do
   @behaviour Ecto.Adapter.Queryable
 
   import Ecto.Adapters.Mnesia.Table, only: [
-    field_index: 2,
-    field_name: 2
+    attributes: 1,
+    field_index: 2
   ]
 
   alias Ecto.Adapters.Mnesia
   alias Ecto.Adapters.Mnesia.Connection
-  alias Ecto.Adapters.Mnesia.Schema
+  alias Ecto.Adapters.Mnesia.Record
 
   @id_seq_table_name :id_seq
 
@@ -72,6 +72,7 @@ defmodule Ecto.Adapters.Mnesia do
     {:nocache,
       %Mnesia.Query{
         type: :all,
+        schema: schema,
         table_name: table_name,
         match_spec: match_spec
       }
@@ -79,11 +80,16 @@ defmodule Ecto.Adapters.Mnesia do
     params,
     _opts
   ) do
-    {:atomic, result} = :mnesia.transaction(fn ->
-      # TODO reorder values according to schema ?
+    case :mnesia.transaction(fn ->
       :mnesia.select(table_name, match_spec.(params))
-    end)
-    {length(result), result}
+    end) do
+      {:atomic, result} ->
+        context = [table_name: table_name, schema: schema]
+        result = Enum.map(result, &Record.Attributes.to_schema_attributes(&1, context))
+
+        {length(result), result}
+      {:aborted, _} -> {0, nil}
+    end
   end
 
   def execute(
@@ -105,7 +111,7 @@ defmodule Ecto.Adapters.Mnesia do
       |> Enum.map(fn (record) -> new_record.(record, params) end)
       |> Enum.map(fn (record) ->
         with :ok <- :mnesia.write(table_name, record, :write) do
-          Schema.from_record(table_name, record)
+          Record.to_schema(table_name, record)
         end
       end)
     end) do
@@ -134,7 +140,7 @@ defmodule Ecto.Adapters.Mnesia do
       end)
     end) do
       {:atomic, result} -> {length(result), nil}
-      {:aborted, e} -> {0, e}
+      {:aborted, _} -> {0, nil}
     end
   end
 
@@ -143,7 +149,7 @@ defmodule Ecto.Adapters.Mnesia do
     _adapter_meta,
     _query_meta,
     {:nocache,
-      %Mnesia.Query{table_name: table_name, match_spec: match_spec}
+      %Mnesia.Query{table_name: table_name, schema: schema, match_spec: match_spec}
     },
     params,
     _opts
@@ -152,7 +158,9 @@ defmodule Ecto.Adapters.Mnesia do
       # TODO reorder values according to schema ?
       :mnesia.select(table_name, match_spec.(params))
     end)
-    result
+
+    context = [table_name: table_name, schema: schema]
+    Enum.map(result, &Record.Attributes.to_schema_attributes(&1, context))
   end
 
   @impl Ecto.Adapter.Schema
@@ -183,12 +191,13 @@ defmodule Ecto.Adapters.Mnesia do
       schema: schema,
       autogenerate_id: autogenerate_id
     ]
-    record = Schema.build_record(params, context)
+    record = Record.build(params, context)
     id = elem(record, 1)
 
     case :mnesia.transaction(fn ->
-      :mnesia.write(table_name, record, :write)
-      :mnesia.read(table_name, id)
+      with :ok <- :mnesia.write(table_name, record, :write) do
+        :mnesia.read(table_name, id)
+      end
     end) do
       {:atomic, [record]} ->
         result = returning
@@ -225,10 +234,11 @@ defmodule Ecto.Adapters.Mnesia do
 
     case :mnesia.transaction(fn ->
       Enum.map(records, fn (params) ->
-        record = Schema.build_record(params, context)
+        record = Record.build(params, context)
         id = elem(record, 1)
-        :mnesia.write(table_name, record, :write)
-        :mnesia.read(table_name, id)
+        with :ok <- :mnesia.write(table_name, record, :write) do
+          :mnesia.read(table_name, id)
+        end
       end)
     end) do
       {:atomic, created_records} ->
@@ -237,17 +247,17 @@ defmodule Ecto.Adapters.Mnesia do
             elem(record, field_index(attribute, table_name))
           end)
         end)
-        {:ok, result}
-      {:aborted, error} ->
-        {:invalid, [mnesia: "#{inspect(error)}"]}
+        {length(result), result}
+      {:aborted, _error} ->
+        {0, nil}
     end
   end
 
   @impl Ecto.Adapter.Schema
   def update(
     _adapter_meta,
-    %{schema: schema, source: source},
-    fields,
+    %{schema: schema, source: source, autogenerate_id: autogenerate_id},
+    params,
     filters,
     returning,
     _opts
@@ -255,29 +265,24 @@ defmodule Ecto.Adapters.Mnesia do
     table_name = String.to_atom(source)
 
     match_spec = Mnesia.MatchSpec.build({table_name, schema}).(filters)
-    with {:atomic, [record]} <- :mnesia.transaction(fn ->
+    with {:atomic, [attributes]} <- :mnesia.transaction(fn ->
       :mnesia.select(table_name, match_spec.([]))
     end),
       {:atomic, update} <- :mnesia.transaction(fn ->
-          update = record
-                   |> Enum.with_index()
-                   |> Enum.map(fn ({attribute, index}) ->
-                     case Keyword.fetch(fields, field_name(index, table_name)) do
-                       {:ok, value} -> value
-                       :error -> attribute
-                     end
-                   end)
-                   |> List.insert_at(0, schema)
-                   |> List.to_tuple()
+        context = [table_name: table_name, schema: schema, autogenerate_id: autogenerate_id]
+        update = List.zip([attributes(table_name), attributes])
+                 |> Record.build(context)
+                 |> Record.put_change(params, context)
 
-          :mnesia.write(table_name, update, :write)
+        with :ok <- :mnesia.write(table_name, update, :write) do
           update
+        end
         end) do
-            result = returning
-                     |> Enum.map(fn (attribute) ->
-                       {attribute, elem(update, field_index(attribute, table_name))}
-                     end)
-            {:ok, result}
+        result = returning
+                 |> Enum.map(fn (attribute) ->
+                   {attribute, elem(update, field_index(attribute, table_name))}
+                 end)
+        {:ok, result}
     else
       {:atomic, []} -> {:error, :stale}
       {:aborted, error} -> {:invalid, [mnesia: "#{inspect(error)}"]}

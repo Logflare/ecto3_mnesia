@@ -8,7 +8,7 @@ defmodule Ecto.Adapters.Mnesia.MatchSpec do
   @type t :: (list(%BooleanExpr{}) | Keyword.t() -> (params :: list() -> :ets.match_spec()))
 
   @spec build(
-    {table_name :: atom(), schema :: struct()}
+    {table_name :: atom(), schema :: atom()}
   ) :: (list(%BooleanExpr{}) | Keyword.t() -> (params :: list() -> :ets.match_spec()))
   def build({table_name, schema}) do
     head = head(table_name, schema)

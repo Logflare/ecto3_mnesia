@@ -10,9 +10,8 @@ defmodule Ecto.Adapters.Mnesia.SchemaIntegrationTest do
     use Ecto.Schema
 
     schema "#{Ecto.Adapters.Mnesia.SchemaIntegrationTest.Table}" do
-      field :field, :string
-
       timestamps()
+      field :field, :string
     end
 
     def changeset(%TestSchema{} = struct, params) do
@@ -76,13 +75,13 @@ defmodule Ecto.Adapters.Mnesia.SchemaIntegrationTest do
         on_conflict: :replace_all,
         returning: [:id]
       ) do
-        {:ok, _records} ->
-          assert true
+        {count, _records} ->
+          assert count == 2
+
           {:atomic, results} = :mnesia.transaction(fn ->
             :mnesia.foldl(fn (record, acc) -> [record|acc] end, [], @table_name)
           end)
 
-          assert length(results) == 2
           assert Enum.all?(results, fn
             ({TestSchema, _, "field 1", _, _}) -> true
             ({TestSchema, _, "field 2", _, _}) -> true
@@ -102,15 +101,14 @@ defmodule Ecto.Adapters.Mnesia.SchemaIntegrationTest do
         on_conflict: :replace_all,
         returning: [:id]
       ) do
-        {:ok, records} ->
-          assert true
+        {count, records} ->
+          assert count == 2
           {:atomic, results} = :mnesia.transaction(fn ->
             Enum.map(records, fn (%{id: id}) ->
               :mnesia.read(@table_name, id)
             end)
           end)
 
-          assert length(results) == 2
           assert Enum.all?(results, fn
             ([{TestSchema, _, "field 1", _, _}]) -> true
             ([{TestSchema, _, "field 2", _, _}]) -> true
@@ -133,17 +131,17 @@ defmodule Ecto.Adapters.Mnesia.SchemaIntegrationTest do
     end
 
     test "Repo#update valid record with [on_conflict: :replace_all]", %{record: record} do
+      id = record.id
       changeset = TestSchema.changeset(record, %{field: "field updated"})
 
       case TestRepo.update(changeset) do
-        {:ok, %TestSchema{id: 1, field: "field updated"}} -> assert true
-        _ -> assert false
-      end
-
-      case :mnesia.transaction(fn ->
-        :mnesia.read(@table_name, 1)
-      end) do
-        {:atomic, [{TestSchema, 1, "field updated", _, _}]} -> assert true
+        {:ok, %TestSchema{id: ^id, field: "field updated"}} ->
+          case :mnesia.transaction(fn ->
+            :mnesia.read(@table_name, id)
+          end) do
+            {:atomic, [{TestSchema, ^id, "field updated", _, _}]} -> assert true
+            e -> assert false == e
+          end
         _ -> assert false
       end
 

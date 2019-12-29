@@ -1,22 +1,22 @@
 defmodule Ecto.Adapters.Mnesia.Query do
   import Ecto.Adapters.Mnesia.Table, only: [
-    record_field_index: 2,
-    field_index: 2
+    record_field_index: 2
   ]
 
   alias Ecto.Adapters.Mnesia
   alias Ecto.Query.QueryExpr
 
-  defstruct type: nil, table_name: nil, match_spec: nil, new_record: nil
+  defstruct type: nil, table_name: nil, schema: nil, match_spec: nil, new_record: nil
 
   @type t :: %__MODULE__{
     type: :all | :update_all | :delete_all,
     table_name: atom(),
+    schema: atom(),
     match_spec: (params :: list() -> :ets.match_spec()),
     new_record: (tuple(), list() -> tuple())
   }
 
-  @spec from_ecto_query(type :: :all | :update_all | :delete_all, ecto_query :: Ecto.Query.t()) :: mnesia_query :: t()
+  @spec from_ecto_query(type :: atom(), ecto_query :: Ecto.Query.t()) :: mnesia_query :: %Ecto.Adapters.Mnesia.Query{}
   def from_ecto_query(
     type,
     %Ecto.Query{sources: sources, wheres: wheres, updates: updates}
@@ -29,6 +29,7 @@ defmodule Ecto.Adapters.Mnesia.Query do
     %Mnesia.Query{
       type: type,
       table_name: table_name,
+      schema: schema,
       match_spec: match_spec,
       new_record: new_record
     }
