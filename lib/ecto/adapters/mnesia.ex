@@ -2,6 +2,7 @@ defmodule Ecto.Adapters.Mnesia do
   @behaviour Ecto.Adapter
   @behaviour Ecto.Adapter.Schema
   @behaviour Ecto.Adapter.Queryable
+  @behaviour Ecto.Adapter.Transaction
 
   alias Ecto.Adapters.Mnesia
   alias Ecto.Adapters.Mnesia.Connection
@@ -286,5 +287,23 @@ defmodule Ecto.Adapters.Mnesia do
       {:atomic, []} -> {:error, :stale}
       {:aborted, error} -> {:invalid, [mnesia: "#{inspect(error)}"]}
     end
+  end
+
+  @impl Ecto.Adapter.Transaction
+  def in_transaction?(_adapter_meta), do: :mnesia.is_transaction()
+
+  @impl Ecto.Adapter.Transaction
+  def transaction(_adapter_meta, _options, function) do
+    case :mnesia.transaction(fn ->
+      function.()
+    end) do
+      {:atomic, result} -> {:ok, result}
+      {:aborted, reason} -> {:error, reason}
+    end
+  end
+
+  @impl Ecto.Adapter.Transaction
+  def rollback(_adapter_meta, value) do
+    throw :mnesia.abort(value)
   end
 end
