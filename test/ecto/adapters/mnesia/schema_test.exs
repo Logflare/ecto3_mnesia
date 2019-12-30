@@ -22,6 +22,7 @@ defmodule Ecto.Adapters.Mnesia.SchemaIntegrationTest do
   end
 
   setup_all do
+    ExUnit.CaptureLog.capture_log fn -> Mnesia.storage_up(nodes: [node()]) end
     Mnesia.ensure_all_started([], :permanent)
     {:ok, _repo} = TestRepo.start_link()
 
