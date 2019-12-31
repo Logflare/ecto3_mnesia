@@ -28,7 +28,7 @@ defmodule Ecto.Adapters.MnesiaQueryableIntegrationTest do
       ],
       type: :ordered_set
     ])
-    :ok
+    :mnesia.wait_for_tables([@table_name], 1000)
   end
 
   describe "Ecto.Adapter.Queryable#execute" do

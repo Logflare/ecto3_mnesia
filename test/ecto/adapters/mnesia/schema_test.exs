@@ -32,7 +32,7 @@ defmodule Ecto.Adapters.Mnesia.SchemaIntegrationTest do
       storage_properties: [ ets: [:compressed] ],
       type: :set
     ])
-    :ok
+    :mnesia.wait_for_tables([@table_name], 1000)
   end
 
   describe "Ecto.Adapters.Schema#insert" do
