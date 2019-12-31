@@ -4,6 +4,14 @@ defmodule Ecto.Adapters.MnesiaAdapterIntegrationTest do
   alias EctoMnesia.TestRepo
   alias Ecto.Adapters.Mnesia
 
+  defmodule TestSchema do
+    use Ecto.Schema
+
+    schema "test_schema" do
+      field :field, :string
+    end
+  end
+
   setup do
     Mnesia.ensure_all_started([], :permanent)
     :ok

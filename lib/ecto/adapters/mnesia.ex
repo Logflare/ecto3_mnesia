@@ -1,10 +1,12 @@
 defmodule Ecto.Adapters.Mnesia do
   @behaviour Ecto.Adapter
+  @behaviour Ecto.Adapter.Schema
   @behaviour Ecto.Adapter.Queryable
 
   alias Ecto.Adapters.Mnesia
   alias Ecto.Adapters.Mnesia.Connection
-  alias Ecto.Adapters.Mnesia.Schema
+  alias Ecto.Adapters.Mnesia.Record
+  alias Ecto.Adapters.Mnesia.Table
 
   @impl Ecto.Adapter
   defmacro __before_compile__(_env), do: true
@@ -20,14 +22,15 @@ defmodule Ecto.Adapters.Mnesia do
 
 
   @impl Ecto.Adapter
-  def ensure_all_started(_config, _type) do
+  def ensure_all_started(config, _type) do
+    :mnesia.create_schema(config[:nodes] || [node()])
     {:ok, _} = Application.ensure_all_started(:mnesia)
     {:ok, []}
   end
 
   @impl Ecto.Adapter
-  def init(_config) do
-    {:ok, Connection.child_spec(), %{}}
+  def init(config \\ []) do
+    {:ok, Connection.child_spec(config), %{}}
   end
 
   @impl Ecto.Adapter
@@ -45,6 +48,7 @@ defmodule Ecto.Adapters.Mnesia do
     {:nocache,
       %Mnesia.Query{
         type: :all,
+        schema: schema,
         table_name: table_name,
         match_spec: match_spec
       }
@@ -52,12 +56,18 @@ defmodule Ecto.Adapters.Mnesia do
     params,
     _opts
   ) do
-    {:atomic, result} = :mnesia.transaction(fn ->
-      # TODO reorder values according to schema ?
+    case :mnesia.transaction(fn ->
       :mnesia.select(table_name, match_spec.(params))
-    end)
-    {length(result), result}
+    end) do
+      {:atomic, result} ->
+        context = [table_name: table_name, schema: schema]
+        result = Enum.map(result, &Record.Attributes.to_schema_attributes(&1, context))
+
+        {length(result), result}
+      {:aborted, _} -> {0, nil}
+    end
   end
+
   def execute(
     _adapter_meta,
     _query_meta,
@@ -77,7 +87,7 @@ defmodule Ecto.Adapters.Mnesia do
       |> Enum.map(fn (record) -> new_record.(record, params) end)
       |> Enum.map(fn (record) ->
         with :ok <- :mnesia.write(table_name, record, :write) do
-          Schema.from_mnesia(table_name, record)
+          Record.to_schema(table_name, record)
         end
       end)
     end) do
@@ -106,7 +116,7 @@ defmodule Ecto.Adapters.Mnesia do
       end)
     end) do
       {:atomic, result} -> {length(result), nil}
-      {:aborted, e} -> {0, e}
+      {:aborted, _} -> {0, nil}
     end
   end
 
@@ -115,7 +125,7 @@ defmodule Ecto.Adapters.Mnesia do
     _adapter_meta,
     _query_meta,
     {:nocache,
-      %Mnesia.Query{table_name: table_name, match_spec: match_spec}
+      %Mnesia.Query{table_name: table_name, schema: schema, match_spec: match_spec}
     },
     params,
     _opts
@@ -124,6 +134,157 @@ defmodule Ecto.Adapters.Mnesia do
       # TODO reorder values according to schema ?
       :mnesia.select(table_name, match_spec.(params))
     end)
-    result
+
+    context = [table_name: table_name, schema: schema]
+    Enum.map(result, &Record.Attributes.to_schema_attributes(&1, context))
+  end
+
+  @impl Ecto.Adapter.Schema
+  def autogenerate(:id) do
+    # NOTE /!\ need to call :dets.close/1 on shutdown to close properly table in order to keep state
+    :mnesia.dirty_update_counter({Connection.id_seq_table_name(), :id}, 1)
+  end
+  def autogenerate(:embed_id), do: Ecto.UUID.generate()
+  def autogenerate(:binary_id), do: Ecto.UUID.bingenerate()
+
+  @impl Ecto.Adapter.Schema
+  def insert(
+    _adapter_meta,
+    %{schema: schema, source: source, autogenerate_id: autogenerate_id},
+    params,
+    _on_conflict,
+    returning,
+    opts
+  ) do
+    if opts[:on_conflict] != :replace_all do
+      # TODO manage others `on_conflict` configurations
+      raise "only [on_conflict: :replace_all] is supported by the adapter"
+    end
+
+    table_name = String.to_atom(source)
+    context = [
+      table_name: table_name,
+      schema: schema,
+      autogenerate_id: autogenerate_id
+    ]
+    record = Record.build(params, context)
+    id = elem(record, 1)
+
+    case :mnesia.transaction(fn ->
+      with :ok <- :mnesia.write(table_name, record, :write) do
+        :mnesia.read(table_name, id)
+      end
+    end) do
+      {:atomic, [record]} ->
+        result = returning
+        |> Enum.map(fn (field) ->
+          {field, Record.attribute(record, field, context)}
+        end)
+        {:ok, result}
+      {:aborted, error} ->
+        {:invalid, [mnesia: "#{inspect(error)}"]}
+    end
+  end
+
+  @impl Ecto.Adapter.Schema
+  def insert_all(
+    _adapter_meta,
+    %{schema: schema, source: source, autogenerate_id: autogenerate_id},
+    _header,
+    records,
+    _on_conflict,
+    returning,
+    opts
+  ) do
+    if opts[:on_conflict] != :replace_all do
+      # TODO manage others `on_conflict` configurations
+      raise "only [on_conflict: :replace_all] is supported by the adapter"
+    end
+
+    table_name = String.to_atom(source)
+    context = [
+      table_name: table_name,
+      schema: schema,
+      autogenerate_id: autogenerate_id
+    ]
+
+    case :mnesia.transaction(fn ->
+      Enum.map(records, fn (params) ->
+        record = Record.build(params, context)
+        id = elem(record, 1)
+        with :ok <- :mnesia.write(table_name, record, :write) do
+          :mnesia.read(table_name, id)
+        end
+      end)
+    end) do
+      {:atomic, created_records} ->
+        result = Enum.map(created_records, fn ([record]) ->
+          Enum.map(returning, fn (field) ->
+            Record.attribute(record, field, context)
+          end)
+        end)
+        {length(result), result}
+      {:aborted, _error} ->
+        {0, nil}
+    end
+  end
+
+  @impl Ecto.Adapter.Schema
+  def update(
+    _adapter_meta,
+    %{schema: schema, source: source, autogenerate_id: autogenerate_id},
+    params,
+    filters,
+    returning,
+    _opts
+  ) do
+    table_name = String.to_atom(source)
+    context = [table_name: table_name, schema: schema, autogenerate_id: autogenerate_id]
+
+    match_spec = Mnesia.MatchSpec.build({table_name, schema}).(filters)
+    with {:atomic, [attributes]} <- :mnesia.transaction(fn ->
+      :mnesia.select(table_name, match_spec.([]))
+    end),
+      {:atomic, update} <- :mnesia.transaction(fn ->
+        update = List.zip([Table.attributes(table_name), attributes])
+                 |> Record.build(context)
+                 |> Record.put_change(params, context)
+
+        with :ok <- :mnesia.write(table_name, update, :write) do
+          update
+        end
+        end) do
+        result = returning
+                 |> Enum.map(fn (field) ->
+                   {field, Record.attribute(update, field, context)}
+                 end)
+        {:ok, result}
+    else
+      {:atomic, []} -> {:error, :stale}
+      {:aborted, error} -> {:invalid, [mnesia: "#{inspect(error)}"]}
+    end
+  end
+
+  @impl Ecto.Adapter.Schema
+  def delete(
+    _adapter_meta,
+    %{schema: schema, source: source},
+    filters,
+    _opts
+  ) do
+    table_name = String.to_atom(source)
+
+    match_spec = Mnesia.MatchSpec.build({table_name, schema}).(filters)
+    with {:atomic, [[id|_t]]} <- :mnesia.transaction(fn ->
+      :mnesia.select(table_name, match_spec.([]))
+    end),
+      {:atomic, :ok} <- :mnesia.transaction(fn ->
+          :mnesia.delete(table_name, id, :write)
+        end) do
+      {:ok, []}
+    else
+      {:atomic, []} -> {:error, :stale}
+      {:aborted, error} -> {:invalid, [mnesia: "#{inspect(error)}"]}
+    end
   end
 end

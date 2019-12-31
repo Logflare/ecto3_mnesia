@@ -5,18 +5,28 @@ defmodule Ecto.Adapters.Mnesia.MatchSpec do
 
   alias Ecto.Query.BooleanExpr
 
-  @type t :: (params :: list() -> :ets.match_spec())
+  @type t :: (list(%BooleanExpr{}) | Keyword.t() -> (params :: list() -> :ets.match_spec()))
 
   @spec build(
-    {table_name :: atom(), schema :: struct()},
-    wheres :: list(%Ecto.Query.BooleanExpr{})
-  ) :: (params :: list() -> :ets.match_spec())
-  def build({table_name, schema}, wheres) do
+    {table_name :: atom(), schema :: atom()}
+  ) :: (list(%BooleanExpr{}) | Keyword.t() -> (params :: list() -> :ets.match_spec()))
+  def build({table_name, schema}) do
     head = head(table_name, schema)
-    guards = guards(table_name, wheres)
     result = result()
 
-    fn (params) -> [{head, guards.(params), result}] end
+    fn
+      ([%BooleanExpr{}|_t] = wheres) ->
+        guards = guards(table_name, wheres)
+
+        fn (params) -> [{head, guards.(params), result}] end
+      ([{_k, _v}|_t] = filters) ->
+        guards = Enum.map(filters, fn ({key, value}) ->
+          index = field_index(key, table_name)
+          {:==, :"$#{index}", value}
+        end)
+        fn (_) -> [{head, guards, result}] end
+      ([]) -> fn (_) -> [{head, [], result}] end
+    end
   end
 
   defp head(table_name, schema) do
@@ -64,7 +74,7 @@ defmodule Ecto.Adapters.Mnesia.MatchSpec do
   ) when is_list(values) do
     index = field_index(field, context[:table_name])
     Enum.map(values, fn (value) ->
-      {:==, :"$#{index + 1}", value}
+      {:==, :"$#{index}", value}
     end)
     |> List.insert_at(0, :or)
     |> List.to_tuple()
@@ -81,6 +91,6 @@ defmodule Ecto.Adapters.Mnesia.MatchSpec do
     context
   ) do
     index = field_index(field, context[:table_name])
-    {op, :"$#{index + 1}", value}
+    {op, :"$#{index}", value}
   end
 end
