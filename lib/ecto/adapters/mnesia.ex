@@ -36,24 +36,7 @@ defmodule Ecto.Adapters.Mnesia do
 
   @impl Ecto.Adapter
   def init(config \\ []) do
-    ensure_id_seq_table(config[:nodes])
-    {:ok, Connection.child_spec(), %{}}
-  end
-
-  defp ensure_id_seq_table(nil) do
-    ensure_id_seq_table([node()])
-  end
-  defp ensure_id_seq_table(nodes) when is_list(nodes) do
-    case :mnesia.create_table(@id_seq_table_name, [
-      disc_only_copies: nodes,
-      attributes: [:id, :_dummy],
-      type: :set
-    ]) do
-      {:atomic, :ok} ->
-        :mnesia.wait_for_tables([@id_seq_table_name], 1_000)
-      {:aborted, {:already_exists, @id_seq_table_name}} ->
-        :already_exists
-    end
+    {:ok, Connection.child_spec(config), %{}}
   end
 
   @impl Ecto.Adapter
@@ -165,7 +148,7 @@ defmodule Ecto.Adapters.Mnesia do
   @impl Ecto.Adapter.Schema
   def autogenerate(:id) do
     # NOTE /!\ need to call :dets.close/1 on shutdown to close properly table in order to keep state
-    :mnesia.dirty_update_counter({@id_seq_table_name, :id}, 1)
+    :mnesia.dirty_update_counter({Connection.id_seq_table_name(), :id}, 1)
   end
   def autogenerate(:embed_id), do: Ecto.UUID.generate()
   def autogenerate(:binary_id), do: Ecto.UUID.bingenerate()
