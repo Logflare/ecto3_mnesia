@@ -3,16 +3,10 @@ defmodule Ecto.Adapters.Mnesia do
   @behaviour Ecto.Adapter.Schema
   @behaviour Ecto.Adapter.Queryable
 
-  import Ecto.Adapters.Mnesia.Table, only: [
-    attributes: 1,
-    field_index: 2
-  ]
-
   alias Ecto.Adapters.Mnesia
   alias Ecto.Adapters.Mnesia.Connection
   alias Ecto.Adapters.Mnesia.Record
-
-  @id_seq_table_name :id_seq
+  alias Ecto.Adapters.Mnesia.Table
 
   @impl Ecto.Adapter
   defmacro __before_compile__(_env), do: true
@@ -183,8 +177,8 @@ defmodule Ecto.Adapters.Mnesia do
     end) do
       {:atomic, [record]} ->
         result = returning
-        |> Enum.map(fn (attribute) ->
-          {attribute, elem(record, field_index(attribute, table_name))}
+        |> Enum.map(fn (field) ->
+          {field, Record.attribute(record, field, context)}
         end)
         {:ok, result}
       {:aborted, error} ->
@@ -225,8 +219,8 @@ defmodule Ecto.Adapters.Mnesia do
     end) do
       {:atomic, created_records} ->
         result = Enum.map(created_records, fn ([record]) ->
-          Enum.map(returning, fn (attribute) ->
-            elem(record, field_index(attribute, table_name))
+          Enum.map(returning, fn (field) ->
+            Record.attribute(record, field, context)
           end)
         end)
         {length(result), result}
@@ -245,14 +239,14 @@ defmodule Ecto.Adapters.Mnesia do
     _opts
   ) do
     table_name = String.to_atom(source)
+    context = [table_name: table_name, schema: schema, autogenerate_id: autogenerate_id]
 
     match_spec = Mnesia.MatchSpec.build({table_name, schema}).(filters)
     with {:atomic, [attributes]} <- :mnesia.transaction(fn ->
       :mnesia.select(table_name, match_spec.([]))
     end),
       {:atomic, update} <- :mnesia.transaction(fn ->
-        context = [table_name: table_name, schema: schema, autogenerate_id: autogenerate_id]
-        update = List.zip([attributes(table_name), attributes])
+        update = List.zip([Table.attributes(table_name), attributes])
                  |> Record.build(context)
                  |> Record.put_change(params, context)
 
@@ -261,8 +255,8 @@ defmodule Ecto.Adapters.Mnesia do
         end
         end) do
         result = returning
-                 |> Enum.map(fn (attribute) ->
-                   {attribute, elem(update, field_index(attribute, table_name))}
+                 |> Enum.map(fn (field) ->
+                   {field, Record.attribute(update, field, context)}
                  end)
         {:ok, result}
     else

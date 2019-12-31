@@ -70,6 +70,13 @@ defmodule Ecto.Adapters.Mnesia.Record do
     |> List.to_tuple()
   end
 
+  @spec attribute(record :: t(), field :: atom(), context :: Keyword.t()) :: atribute :: any()
+  def attribute(record, field, context) do
+    table_name = context[:table_name]
+
+    elem(record, field_index(field, table_name))
+  end
+
   defmodule Attributes do
     @type t :: list()
 
