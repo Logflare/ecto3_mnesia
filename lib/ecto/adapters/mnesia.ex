@@ -1,7 +1,8 @@
 defmodule Ecto.Adapters.Mnesia do
   @behaviour Ecto.Adapter
-  @behaviour Ecto.Adapter.Schema
   @behaviour Ecto.Adapter.Queryable
+  @behaviour Ecto.Adapter.Schema
+  @behaviour Ecto.Adapter.Storage
   @behaviour Ecto.Adapter.Transaction
 
   alias Ecto.Adapters.Mnesia
@@ -23,8 +24,7 @@ defmodule Ecto.Adapters.Mnesia do
 
 
   @impl Ecto.Adapter
-  def ensure_all_started(config, _type) do
-    :mnesia.create_schema(config[:nodes] || [node()])
+  def ensure_all_started(_config, _type) do
     {:ok, _} = Application.ensure_all_started(:mnesia)
     {:ok, []}
   end
@@ -305,5 +305,36 @@ defmodule Ecto.Adapters.Mnesia do
   @impl Ecto.Adapter.Transaction
   def rollback(_adapter_meta, value) do
     throw :mnesia.abort(value)
+  end
+
+  @impl Ecto.Adapter.Storage
+  def storage_up(options) do
+    :mnesia.stop()
+    case :mnesia.create_schema(options[:nodes] || [node()]) do
+      :ok ->
+        :mnesia.start()
+      {:error, {_, {:already_exists, _}}} ->
+        with :ok <- :mnesia.start() do
+          {:error, :already_up}
+        end
+    end
+  end
+
+  @impl Ecto.Adapter.Storage
+  def storage_down(options) do
+    :mnesia.stop()
+    case :mnesia.delete_schema(options[:nodes] || [node()]) do
+      :ok ->
+        :mnesia.start()
+    end
+  end
+
+  @impl Ecto.Adapter.Storage
+  def storage_status(_options) do
+    path = List.to_string(:mnesia.system_info(:directory)) <> "/schema.DAT"
+    case File.exists?(path) do
+      true ->  :up
+      false -> :down
+    end
   end
 end
