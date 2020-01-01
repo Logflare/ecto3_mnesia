@@ -1,5 +1,6 @@
 defmodule Ecto.Adapters.MnesiaQueryableIntegrationTest do
   use ExUnit.Case, async: false
+
   import Ecto.Query, only: [from: 2]
 
   alias EctoMnesia.TestRepo
@@ -33,7 +34,9 @@ defmodule Ecto.Adapters.MnesiaQueryableIntegrationTest do
 
   describe "Ecto.Adapter.Queryable#execute" do
     test "#all from one table with no query, no records" do
-      assert TestRepo.all(TestSchema) == []
+      TestRepo.transaction fn ->
+        assert TestRepo.all(TestSchema) == []
+      end
     end
 
     test "#all from one table with no query, records" do
