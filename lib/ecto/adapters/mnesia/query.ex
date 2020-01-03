@@ -5,13 +5,15 @@ defmodule Ecto.Adapters.Mnesia.Query do
 
   alias Ecto.Adapters.Mnesia
   alias Ecto.Query.QueryExpr
+  alias Ecto.Query.SelectExpr
 
-  defstruct type: nil, table_name: nil, schema: nil, match_spec: nil, new_record: nil
+  defstruct type: nil, table_name: nil, schema: nil, fields: nil, match_spec: nil, new_record: nil
 
   @type t :: %__MODULE__{
     type: :all | :update_all | :delete_all,
     table_name: atom(),
     schema: atom(),
+    fields: list(atom()),
     match_spec: (params :: list() -> :ets.match_spec()),
     new_record: (tuple(), list() -> tuple())
   }
@@ -19,10 +21,11 @@ defmodule Ecto.Adapters.Mnesia.Query do
   @spec from_ecto_query(type :: atom(), ecto_query :: Ecto.Query.t()) :: mnesia_query :: %Ecto.Adapters.Mnesia.Query{}
   def from_ecto_query(
     type,
-    %Ecto.Query{sources: sources, wheres: wheres, updates: updates}
+    %Ecto.Query{select: select, sources: sources, wheres: wheres, updates: updates}
   ) do
     {table_name, schema} = sources(sources)
 
+    fields = fields(select, schema)
     match_spec = Mnesia.MatchSpec.build({table_name, schema}).(wheres)
     new_record = new_record({table_name, schema}, updates)
 
@@ -30,6 +33,7 @@ defmodule Ecto.Adapters.Mnesia.Query do
       type: type,
       table_name: table_name,
       schema: schema,
+      fields: fields,
       match_spec: match_spec,
       new_record: new_record
     }
@@ -40,6 +44,13 @@ defmodule Ecto.Adapters.Mnesia.Query do
 
     {String.to_atom(table_name), schema}
   end
+
+  defp fields(%SelectExpr{fields: fields}, schema) do
+    Enum.map(fields, &field(&1))
+  end
+  defp fields(_, schema), do: schema.__schema__(:fields)
+
+  defp field({{_, _, [{:&, [], [0]}, field]}, [], []}), do: field
 
   defp new_record({table_name, schema}, updates) do
     fn (record, params) ->

@@ -51,17 +51,19 @@ defmodule Ecto.Adapters.Mnesia do
         type: :all,
         schema: schema,
         table_name: table_name,
+        fields: fields,
         match_spec: match_spec
       }
     },
     params,
     _opts
   ) do
+    context = [table_name: table_name, schema: schema, fields: fields]
+
     case :mnesia.transaction(fn ->
       :mnesia.select(table_name, match_spec.(params))
     end) do
       {:atomic, result} ->
-        context = [table_name: table_name, schema: schema]
         result = Enum.map(result, &Record.Attributes.to_schema_attributes(&1, context))
 
         {length(result), result}
