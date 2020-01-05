@@ -86,14 +86,19 @@ defmodule Ecto.Adapters.Mnesia.Record do
 
     @spec to_schema_attributes(record_attributes :: list(), context :: Keyword.t()) :: schema_attributes :: list()
     def to_schema_attributes(record_attributes, context) do
-      table_name = context[:table_name]
-      schema = context[:schema]
+      {table_name, _schema} = source = context[:source]
       fields = context[:fields]
 
-      fields
+      fields.(source)
       |> Enum.map(fn (field) ->
         Enum.at(record_attributes, record_field_index(field, table_name))
       end)
+    end
+
+    @spec to_erl_var(attribute :: atom(), source :: tuple()) :: erl_var :: String.t()
+    def to_erl_var(attribute, {_table_name, schema}) do
+      (schema |> to_string() |> String.split(".") |> List.last()) <>
+        (attribute |> Atom.to_string() |> String.capitalize())
     end
   end
 end
