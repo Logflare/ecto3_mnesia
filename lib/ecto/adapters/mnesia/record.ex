@@ -78,23 +78,27 @@ defmodule Ecto.Adapters.Mnesia.Record do
   end
 
   defmodule Attributes do
+    import Ecto.Adapters.Mnesia.Table, only: [
+      record_field_index: 2,
+    ]
+
     @type t :: list()
 
     @spec to_schema_attributes(record_attributes :: list(), context :: Keyword.t()) :: schema_attributes :: list()
     def to_schema_attributes(record_attributes, context) do
-      table_name = context[:table_name]
-      schema = context[:schema]
+      {table_name, _schema} = source = context[:source]
+      fields = context[:fields]
 
-      record_attributes
-      |> Enum.with_index()
-      |> Enum.sort_by(fn ({_attribute, index}) ->
-        Enum.find_index(
-          schema.__schema__(:fields),
-          fn (e) -> e == field_name(index, table_name) end
-        )
+      fields.(source)
+      |> Enum.map(fn (field) ->
+        Enum.at(record_attributes, record_field_index(field, table_name))
       end)
-      |> Enum.map(fn ({attribute, _}) -> attribute end)
+    end
 
+    @spec to_erl_var(attribute :: atom(), source :: tuple()) :: erl_var :: String.t()
+    def to_erl_var(attribute, {_table_name, schema}) do
+      (schema |> to_string() |> String.split(".") |> List.last()) <>
+        (attribute |> Atom.to_string() |> String.capitalize())
     end
   end
 end

@@ -5,40 +5,66 @@ defmodule Ecto.Adapters.Mnesia.Query do
 
   alias Ecto.Adapters.Mnesia
   alias Ecto.Query.QueryExpr
+  alias Ecto.Query.SelectExpr
+  require Qlc
 
-  defstruct type: nil, table_name: nil, schema: nil, match_spec: nil, new_record: nil
+  defstruct type: nil, table_name: nil, schema: nil, sources: nil, fields: nil, qlc: nil, new_record: nil
 
   @type t :: %__MODULE__{
     type: :all | :update_all | :delete_all,
     table_name: atom(),
     schema: atom(),
-    match_spec: (params :: list() -> :ets.match_spec()),
+    sources: Keyword.t(),
+    fields: (source :: tuple() -> list(atom())),
+    qlc: (params :: list() -> qlc_string :: String.t()),
     new_record: (tuple(), list() -> tuple())
   }
 
   @spec from_ecto_query(type :: atom(), ecto_query :: Ecto.Query.t()) :: mnesia_query :: %Ecto.Adapters.Mnesia.Query{}
   def from_ecto_query(
     type,
-    %Ecto.Query{sources: sources, wheres: wheres, updates: updates}
+    %Ecto.Query{select: select, joins: joins, sources: sources, wheres: wheres, updates: updates}
   ) do
-    {table_name, schema} = sources(sources)
+    sources = sources(sources)
+    {table_name, schema} = Enum.at(sources, 0)
 
-    match_spec = Mnesia.MatchSpec.build({table_name, schema}).(wheres)
+    fields = fields(select, sources)
+    qlc = Mnesia.Qlc.build(select, joins, sources).(wheres)
     new_record = new_record({table_name, schema}, updates)
 
     %Mnesia.Query{
       type: type,
       table_name: table_name,
       schema: schema,
-      match_spec: match_spec,
+      sources: sources,
+      fields: fields,
+      qlc: qlc,
       new_record: new_record
     }
   end
 
   defp sources(sources) do
-    {{table_name, schema, _}} = sources
+    sources
+    |> Tuple.to_list()
+    |> Enum.map(fn ({table_name, schema, _}) ->
+      {String.to_atom(table_name), schema}
+    end)
+  end
 
-    {String.to_atom(table_name), schema}
+  defp fields(%SelectExpr{fields: fields}, sources) do
+    fn (source) ->
+      Enum.map(fields, &field(&1, sources))
+      |> Enum.reject(&is_nil(&1))
+    end
+  end
+  defp fields(_, _sources) do
+    fn ({_, schema}) ->
+      schema.__schema__(:fields)
+    end
+  end
+
+  defp field({{_, _, [{:&, [], [source_index]}, _field]}, [], []}, sources) do
+    Enum.at(sources, source_index)
   end
 
   defp new_record({table_name, schema}, updates) do

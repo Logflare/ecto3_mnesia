@@ -126,8 +126,6 @@ defmodule Ecto.Adapters.MnesiaQueryableIntegrationTest do
 
     test "#all from one table with simple where query, many records" do
       {:atomic, _result} = :mnesia.transaction(fn ->
-        :mnesia.write(@table_name, {TestSchema, 1, "field"}, :write)
-
         Stream.iterate(0, &(&1 + 1))
         |> Enum.take(10_000)
         |> Enum.map(fn (id) ->
@@ -277,12 +275,11 @@ defmodule Ecto.Adapters.MnesiaQueryableIntegrationTest do
       end)
 
       case TestRepo.all(
-        from(s in TestSchema, where: s.id in [1, 2, 3])
+        from(s in TestSchema, where: s.id in [1, 3])
       ) do
         [
-          %{id: 1, field: "field 1"},
-          %{id: 2, field: "field 2"},
-          %{id: 3, field: "field 3"}
+          %TestSchema{id: 1, field: "field 1"},
+          %TestSchema{id: 3, field: "field 3"}
         ] -> assert true
         e -> assert e == false
       end
@@ -302,15 +299,14 @@ defmodule Ecto.Adapters.MnesiaQueryableIntegrationTest do
         end)
       end)
 
-      ids = [1, 2, 3]
+      ids = [1, 3]
       id = 1
       case TestRepo.all(
         from(s in TestSchema, where: s.id == ^id or s.id in ^ids)
       ) do
         [
-          %{id: 1, field: "field 1"},
-          %{id: 2, field: "field 2"},
-          %{id: 3, field: "field 3"}
+          %TestSchema{id: 1, field: "field 1"},
+          %TestSchema{id: 3, field: "field 3"}
         ] -> assert true
         e -> assert e == false
       end

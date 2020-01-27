@@ -3,13 +3,12 @@ stages:
 
 test:
   stage: test
-  image: elixir:1.9.4-alpine
+  image: elixir:1.9.4
   cache:
     key: ${CI_COMMIT_REF_SLUG}
     paths:
     - _build/
   before_script:
-  - apk --update add git make g++
   - mix local.hex --force
   - mix local.rebar --force
   - mix deps.get
@@ -20,13 +19,12 @@ test:
 
 dialyzer:
   stage: test
-  image: elixir:1.9.4-alpine
+  image: elixir:1.9.4
   cache:
     key: ${CI_COMMIT_REF_SLUG}
     paths:
     - _build/
   before_script:
-  - apk --update add git make g++
   - mix local.hex --force
   - mix local.rebar --force
   - mix deps.get

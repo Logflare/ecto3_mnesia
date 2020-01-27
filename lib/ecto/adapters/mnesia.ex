@@ -5,6 +5,8 @@ defmodule Ecto.Adapters.Mnesia do
   @behaviour Ecto.Adapter.Storage
   @behaviour Ecto.Adapter.Transaction
 
+  require Qlc
+
   alias Ecto.Adapters.Mnesia
   alias Ecto.Adapters.Mnesia.Connection
   alias Ecto.Adapters.Mnesia.Record
@@ -49,21 +51,16 @@ defmodule Ecto.Adapters.Mnesia do
     {:nocache,
       %Mnesia.Query{
         type: :all,
-        schema: schema,
-        table_name: table_name,
-        match_spec: match_spec
+        qlc: qlc
       }
     },
     params,
     _opts
   ) do
     case :mnesia.transaction(fn ->
-      :mnesia.select(table_name, match_spec.(params))
+      Qlc.q(qlc.(params), []) |> Qlc.e()
     end) do
       {:atomic, result} ->
-        context = [table_name: table_name, schema: schema]
-        result = Enum.map(result, &Record.Attributes.to_schema_attributes(&1, context))
-
         {length(result), result}
       {:aborted, _} -> {0, nil}
     end
@@ -76,7 +73,7 @@ defmodule Ecto.Adapters.Mnesia do
       %Mnesia.Query{
         type: :update_all,
         table_name: table_name,
-        match_spec: match_spec,
+        qlc: qlc,
         new_record: new_record
       }
     },
@@ -84,7 +81,8 @@ defmodule Ecto.Adapters.Mnesia do
     _opts
   ) do
     case :mnesia.transaction(fn ->
-      :mnesia.select(table_name, match_spec.(params))
+      Qlc.q(qlc.(params), [])
+      |> Qlc.e()
       |> Enum.map(fn (record) -> new_record.(record, params) end)
       |> Enum.map(fn (record) ->
         with :ok <- :mnesia.write(table_name, record, :write) do
@@ -104,14 +102,14 @@ defmodule Ecto.Adapters.Mnesia do
       %Mnesia.Query{
         type: :delete_all,
         table_name: table_name,
-        match_spec: match_spec
+        qlc: qlc
       }
     },
     params,
     _opts
   ) do
     case :mnesia.transaction(fn ->
-      :mnesia.select(table_name, match_spec.(params))
+      Qlc.q(qlc.(params), []) |> Qlc.e()
       |> Enum.map(fn (record) ->
         :mnesia.delete(table_name, List.first(record), :write)
       end)
@@ -126,18 +124,27 @@ defmodule Ecto.Adapters.Mnesia do
     _adapter_meta,
     _query_meta,
     {:nocache,
-      %Mnesia.Query{table_name: table_name, schema: schema, match_spec: match_spec}
+      %Mnesia.Query{
+        sources: sources,
+        fields: fields,
+        qlc: qlc,
+      }
     },
     params,
     _opts
   ) do
-    {:atomic, result} = :mnesia.transaction(fn ->
-      # TODO reorder values according to schema ?
-      :mnesia.select(table_name, match_spec.(params))
-    end)
+    case :mnesia.transaction(fn ->
+      Enum.flat_map(sources, fn ({table_name, schema} = source) ->
+        result = Qlc.q(qlc.(params), []) |> Qlc.e()
 
-    context = [table_name: table_name, schema: schema]
-    Enum.map(result, &Record.Attributes.to_schema_attributes(&1, context))
+        context = [source: source, table_name: table_name, schema: schema, fields: fields]
+        Enum.map(result, &Record.Attributes.to_schema_attributes(&1, context))
+      end)
+    end) do
+      {:atomic, result} ->
+        result
+      _ -> []
+    end
   end
 
   @impl Ecto.Adapter.Schema
@@ -240,11 +247,12 @@ defmodule Ecto.Adapters.Mnesia do
     _opts
   ) do
     table_name = String.to_atom(source)
+    source = {table_name, schema}
     context = [table_name: table_name, schema: schema, autogenerate_id: autogenerate_id]
 
-    match_spec = Mnesia.MatchSpec.build({table_name, schema}).(filters)
+    qlc = Mnesia.Qlc.build(:all, [], [source]).(filters)
     with {:atomic, [attributes]} <- :mnesia.transaction(fn ->
-      :mnesia.select(table_name, match_spec.([]))
+        Qlc.q(qlc.(params), []) |> Qlc.e()
     end),
       {:atomic, update} <- :mnesia.transaction(fn ->
         update = List.zip([Table.attributes(table_name), attributes])
@@ -274,10 +282,11 @@ defmodule Ecto.Adapters.Mnesia do
     _opts
   ) do
     table_name = String.to_atom(source)
+    source = {table_name, schema}
 
-    match_spec = Mnesia.MatchSpec.build({table_name, schema}).(filters)
+    qlc = Mnesia.Qlc.build(:all, [], [source]).(filters)
     with {:atomic, [[id|_t]]} <- :mnesia.transaction(fn ->
-      :mnesia.select(table_name, match_spec.([]))
+        Qlc.q(qlc.([]), []) |> Qlc.e()
     end),
       {:atomic, :ok} <- :mnesia.transaction(fn ->
           :mnesia.delete(table_name, id, :write)
