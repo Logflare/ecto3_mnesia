@@ -369,6 +369,52 @@ defmodule Ecto.Adapters.MnesiaQueryableIntegrationTest do
 
       :mnesia.clear_table(@table_name)
     end
+
+    test "#all from one table with simple sort query, records" do
+      records = [
+        %TestSchema{id: 1, field: "field 2"},
+        %TestSchema{id: 2, field: "field 3"},
+        %TestSchema{id: 3, field: "field 1"}
+      ]
+      {:atomic, _result} = :mnesia.transaction(fn ->
+        Enum.map(records, fn (%{id: id, field: field}) ->
+          :mnesia.write(@table_name, {TestSchema, id, field}, :write)
+        end)
+      end)
+
+      case TestRepo.all(
+        from(s in TestSchema, order_by: [desc: :field])
+      ) do
+        [%{id: 2, field: "field 3"}, %{id: 1, field: "field 2"}, %{id: 3, field: "field 1"}] -> assert true
+        e -> assert e == false
+      end
+
+      :mnesia.clear_table(@table_name)
+    end
+
+    # NOTE not supported by the adapter yet need to explore the possibility of qlc sort function
+    @tag :skip
+    test "#all from one table with complex sort (multiple fields) query, records" do
+      records = [
+        %TestSchema{id: 1, field: "field 2"},
+        %TestSchema{id: 2, field: "field 2"},
+        %TestSchema{id: 3, field: "field 1"}
+      ]
+      {:atomic, _result} = :mnesia.transaction(fn ->
+        Enum.map(records, fn (%{id: id, field: field}) ->
+          :mnesia.write(@table_name, {TestSchema, id, field}, :write)
+        end)
+      end)
+
+      case TestRepo.all(
+        from(s in TestSchema, order_by: [desc: :id, desc: :field])
+      ) do
+        [%{id: 2, field: "field 2"}, %{id: 1, field: "field 2"}, %{id: 3, field: "field 2"}] -> assert true
+        e -> assert e == false
+      end
+
+      :mnesia.clear_table(@table_name)
+    end
   end
 end
 

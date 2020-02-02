@@ -51,14 +51,18 @@ defmodule Ecto.Adapters.Mnesia do
     {:nocache,
       %Mnesia.Query{
         type: :all,
-        qlc: qlc
+        qlc_query: qlc_query,
+        qlc_sort: qlc_sort
       }
     },
     params,
     _opts
   ) do
     case :mnesia.transaction(fn ->
-      Qlc.q(qlc.(params), []) |> Qlc.e()
+      Qlc.q(qlc_query.(params), [])
+      |> qlc_sort.()
+      |> Qlc.e()
+      |> Enum.map(&Tuple.to_list(&1))
     end) do
       {:atomic, result} ->
         {length(result), result}
@@ -73,7 +77,7 @@ defmodule Ecto.Adapters.Mnesia do
       %Mnesia.Query{
         type: :update_all,
         table_name: table_name,
-        qlc: qlc,
+        qlc_query: qlc_query,
         new_record: new_record
       }
     },
@@ -81,8 +85,9 @@ defmodule Ecto.Adapters.Mnesia do
     _opts
   ) do
     case :mnesia.transaction(fn ->
-      Qlc.q(qlc.(params), [])
+      Qlc.q(qlc_query.(params), [])
       |> Qlc.e()
+      |> Enum.map(&Tuple.to_list(&1))
       |> Enum.map(fn (record) -> new_record.(record, params) end)
       |> Enum.map(fn (record) ->
         with :ok <- :mnesia.write(table_name, record, :write) do
@@ -102,14 +107,15 @@ defmodule Ecto.Adapters.Mnesia do
       %Mnesia.Query{
         type: :delete_all,
         table_name: table_name,
-        qlc: qlc
+        qlc_query: qlc_query
       }
     },
     params,
     _opts
   ) do
     case :mnesia.transaction(fn ->
-      Qlc.q(qlc.(params), []) |> Qlc.e()
+      Qlc.q(qlc_query.(params), []) |> Qlc.e()
+      |> Enum.map(&Tuple.to_list(&1))
       |> Enum.map(fn (record) ->
         :mnesia.delete(table_name, List.first(record), :write)
       end)
@@ -124,22 +130,14 @@ defmodule Ecto.Adapters.Mnesia do
     _adapter_meta,
     _query_meta,
     {:nocache,
-      %Mnesia.Query{
-        sources: sources,
-        fields: fields,
-        qlc: qlc,
-      }
+      %Mnesia.Query{qlc_query: qlc_query}
     },
     params,
     _opts
   ) do
     case :mnesia.transaction(fn ->
-      Enum.flat_map(sources, fn ({table_name, schema} = source) ->
-        result = Qlc.q(qlc.(params), []) |> Qlc.e()
-
-        context = [source: source, table_name: table_name, schema: schema, fields: fields]
-        Enum.map(result, &Record.Attributes.to_schema_attributes(&1, context))
-      end)
+      Qlc.q(qlc_query.(params), []) |> Qlc.e()
+      |> Enum.map(&Tuple.to_list(&1))
     end) do
       {:atomic, result} ->
         result
@@ -250,9 +248,9 @@ defmodule Ecto.Adapters.Mnesia do
     source = {table_name, schema}
     context = [table_name: table_name, schema: schema, autogenerate_id: autogenerate_id]
 
-    qlc = Mnesia.Qlc.build(:all, [], [source]).(filters)
+    qlc_query = Mnesia.Qlc.query(:all, [], [source]).(filters)
     with {:atomic, [attributes]} <- :mnesia.transaction(fn ->
-        Qlc.q(qlc.(params), []) |> Qlc.e()
+        Qlc.q(qlc_query.(params), []) |> Qlc.e()
     end),
       {:atomic, update} <- :mnesia.transaction(fn ->
         update = List.zip([Table.attributes(table_name), attributes])
@@ -284,9 +282,10 @@ defmodule Ecto.Adapters.Mnesia do
     table_name = String.to_atom(source)
     source = {table_name, schema}
 
-    qlc = Mnesia.Qlc.build(:all, [], [source]).(filters)
+    qlc_query = Mnesia.Qlc.query(:all, [], [source]).(filters)
     with {:atomic, [[id|_t]]} <- :mnesia.transaction(fn ->
-        Qlc.q(qlc.([]), []) |> Qlc.e()
+        Qlc.q(qlc_query.([]), []) |> Qlc.e()
+        |> Enum.map(&Tuple.to_list(&1))
     end),
       {:atomic, :ok} <- :mnesia.transaction(fn ->
           :mnesia.delete(table_name, id, :write)

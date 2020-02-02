@@ -8,7 +8,7 @@ defmodule Ecto.Adapters.Mnesia.Query do
   alias Ecto.Query.SelectExpr
   require Qlc
 
-  defstruct type: nil, table_name: nil, schema: nil, sources: nil, fields: nil, qlc: nil, new_record: nil
+  defstruct type: nil, table_name: nil, schema: nil, sources: nil, fields: nil, qlc_query: nil, qlc_sort: nil, new_record: nil
 
   @type t :: %__MODULE__{
     type: :all | :update_all | :delete_all,
@@ -16,20 +16,28 @@ defmodule Ecto.Adapters.Mnesia.Query do
     schema: atom(),
     sources: Keyword.t(),
     fields: (source :: tuple() -> list(atom())),
-    qlc: (params :: list() -> qlc_string :: String.t()),
+    qlc_query: (params :: list() -> qlc_string :: String.t()),
     new_record: (tuple(), list() -> tuple())
   }
 
   @spec from_ecto_query(type :: atom(), ecto_query :: Ecto.Query.t()) :: mnesia_query :: %Ecto.Adapters.Mnesia.Query{}
   def from_ecto_query(
     type,
-    %Ecto.Query{select: select, joins: joins, sources: sources, wheres: wheres, updates: updates}
+    %Ecto.Query{
+      select: select,
+      joins: joins,
+      sources: sources,
+      wheres: wheres,
+      updates: updates,
+      order_bys: order_bys
+    } = query
   ) do
     sources = sources(sources)
     {table_name, schema} = Enum.at(sources, 0)
 
     fields = fields(select, sources)
-    qlc = Mnesia.Qlc.build(select, joins, sources).(wheres)
+    qlc_query = Mnesia.Qlc.query(select, joins, sources).(wheres)
+    qlc_sort = Mnesia.Qlc.sort(order_bys, select, sources)
     new_record = new_record({table_name, schema}, updates)
 
     %Mnesia.Query{
@@ -38,7 +46,8 @@ defmodule Ecto.Adapters.Mnesia.Query do
       schema: schema,
       sources: sources,
       fields: fields,
-      qlc: qlc,
+      qlc_query: qlc_query,
+      qlc_sort: qlc_sort,
       new_record: new_record
     }
   end
