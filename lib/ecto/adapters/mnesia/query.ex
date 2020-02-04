@@ -8,7 +8,7 @@ defmodule Ecto.Adapters.Mnesia.Query do
   alias Ecto.Query.SelectExpr
   require Qlc
 
-  defstruct type: nil, table_name: nil, schema: nil, sources: nil, fields: nil, qlc_query: nil, qlc_sort: nil, new_record: nil
+  defstruct type: nil, table_name: nil, schema: nil, sources: nil, fields: nil, qlc_query: nil, qlc_sort: nil, qlc_next_answers: nil, new_record: nil
 
   @type t :: %__MODULE__{
     type: :all | :update_all | :delete_all,
@@ -29,8 +29,9 @@ defmodule Ecto.Adapters.Mnesia.Query do
       sources: sources,
       wheres: wheres,
       updates: updates,
-      order_bys: order_bys
-    } = query
+      order_bys: order_bys,
+      limit: limit
+    }
   ) do
     sources = sources(sources)
     {table_name, schema} = Enum.at(sources, 0)
@@ -38,6 +39,7 @@ defmodule Ecto.Adapters.Mnesia.Query do
     fields = fields(select, sources)
     qlc_query = Mnesia.Qlc.query(select, joins, sources).(wheres)
     qlc_sort = Mnesia.Qlc.sort(order_bys, select, sources)
+    qlc_next_answers = Mnesia.Qlc.next_answers(limit)
     new_record = new_record({table_name, schema}, updates)
 
     %Mnesia.Query{
@@ -48,6 +50,7 @@ defmodule Ecto.Adapters.Mnesia.Query do
       fields: fields,
       qlc_query: qlc_query,
       qlc_sort: qlc_sort,
+      qlc_next_answers: qlc_next_answers,
       new_record: new_record
     }
   end

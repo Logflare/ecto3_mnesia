@@ -55,6 +55,17 @@ defmodule Ecto.Adapters.Mnesia.Qlc do
     end
   end
 
+  def next_answers(nil) do
+    fn (query) -> Qlc.e(query) end
+  end
+  def next_answers(%QueryExpr{expr: limit}) do
+    fn (query) ->
+      cursor = Qlc.cursor(query)
+      :qlc.next_answers(cursor.c, limit)
+      |> :qlc.e()
+    end
+  end
+
   defp select(select, sources) do
     fields = fields(select, sources)
 
@@ -115,6 +126,7 @@ defmodule Ecto.Adapters.Mnesia.Qlc do
     |> List.insert_at(0, "Schema")
   end
 
+  defp to_qlc(true, _context), do: "true"
   defp to_qlc({field, value}, %{sources: [source]}) do
     erl_var = Record.Attributes.to_erl_var(field, source)
     "#{erl_var} == #{to_erl(value)}"

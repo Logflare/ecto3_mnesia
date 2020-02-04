@@ -52,7 +52,8 @@ defmodule Ecto.Adapters.Mnesia do
       %Mnesia.Query{
         type: :all,
         qlc_query: qlc_query,
-        qlc_sort: qlc_sort
+        qlc_sort: qlc_sort,
+        qlc_next_answers: qlc_next_answers
       }
     },
     params,
@@ -61,7 +62,7 @@ defmodule Ecto.Adapters.Mnesia do
     case :mnesia.transaction(fn ->
       Qlc.q(qlc_query.(params), [])
       |> qlc_sort.()
-      |> Qlc.e()
+      |> qlc_next_answers.()
       |> Enum.map(&Tuple.to_list(&1))
     end) do
       {:atomic, result} ->

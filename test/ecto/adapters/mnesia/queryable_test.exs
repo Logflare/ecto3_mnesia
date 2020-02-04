@@ -415,6 +415,28 @@ defmodule Ecto.Adapters.MnesiaQueryableIntegrationTest do
 
       :mnesia.clear_table(@table_name)
     end
+
+    test "#all from one table with simple limit query, records" do
+      records = [
+        %TestSchema{id: 1, field: "field 1"},
+        %TestSchema{id: 2, field: "field 2"},
+        %TestSchema{id: 3, field: "field 3"},
+      ]
+      {:atomic, _result} = :mnesia.transaction(fn ->
+        Enum.map(records, fn (%{id: id, field: field}) ->
+          :mnesia.write(@table_name, {TestSchema, id, field}, :write)
+        end)
+      end)
+
+      case TestRepo.all(
+        from(s in TestSchema, limit: 2)
+      ) do
+        [%{id: 1, field: "field 1"}, %{id: 2, field: "field 2"}] -> assert true
+        e -> assert e == false
+      end
+
+      :mnesia.clear_table(@table_name)
+    end
   end
 end
 
