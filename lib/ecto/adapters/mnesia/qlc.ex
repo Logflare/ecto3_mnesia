@@ -1,13 +1,22 @@
 defmodule Ecto.Adapters.Mnesia.Qlc do
+  require Qlc
+
   alias Ecto.Adapters.Mnesia.Table
   alias Ecto.Adapters.Mnesia.Record
   alias Ecto.Query.BooleanExpr
+  alias Ecto.Query.QueryExpr
   alias Ecto.Query.SelectExpr
 
-  def build(select, joins, sources) do
+  @order_mapping %{
+    asc: :ascending,
+    desc: :descending
+  }
+
+  @spec query(%SelectExpr{} | :all, any(), list(tuple())) :: (list() -> (params :: list() -> query_handle :: :qlc.query_handle()))
+  def query(select, joins, sources) do
+    select = select(select, sources)
     fn
       ([%BooleanExpr{}] = wheres) ->
-        select = select(select, sources)
         fn (params) ->
           context = %{sources: sources, params: params}
           qualifiers = qualifiers(wheres, context)
@@ -16,27 +25,56 @@ defmodule Ecto.Adapters.Mnesia.Qlc do
           comprehension = [select, Enum.join(joins, ", "), Enum.join(qualifiers, ", ")]
           |> Enum.reject(fn (component) -> String.length(component) == 0 end)
           |> Enum.join(", ")
-          "[#{comprehension}]"
+          Qlc.q("[#{comprehension}]", [])
         end
       (filters) ->
         fn (params) ->
           context = %{sources: sources, params: params}
-          select = select(select, sources)
           qualifiers = qualifiers(filters, context)
 
           joins = joins(joins, context)
           comprehension = [select, Enum.join(joins, ", "), Enum.join(qualifiers, ", ")]
           |> Enum.reject(fn (component) -> String.length(component) == 0 end)
           |> Enum.join(", ")
-          "[#{comprehension}]"
+          Qlc.q("[#{comprehension}]", [])
         end
+    end
+  end
+
+  @spec sort(list(%QueryExpr{}), %SelectExpr{}, list(tuple())) :: (query_handle :: :qlc.query_handle() -> query_handle :: :qlc.query_handle())
+  def sort([], _select, _sources) do
+    fn (query) -> query end
+  end
+  def sort(order_bys, select, sources) do
+    fn (query) ->
+      Enum.reduce(order_bys, query, fn
+        (%QueryExpr{expr: expr}, query1) ->
+          Enum.reduce(expr, query1, fn ({order, field_expr}, query2) ->
+            field = field(field_expr, sources)
+            field_index = Enum.find_index(fields(select, sources), fn (e) -> e == field end)
+
+            Qlc.keysort(query2, field_index, order: @order_mapping[order])
+          end)
+      end)
+    end
+  end
+
+  @spec answers(%QueryExpr{} | nil) :: (query_handle :: :qlc.query_handle() -> list(tuple()))
+  def answers(nil) do
+    fn (query) -> Qlc.e(query) end
+  end
+  def answers(%QueryExpr{expr: limit}) do
+    fn (query) ->
+      cursor = Qlc.cursor(query)
+      :qlc.next_answers(cursor.c, limit)
+      |> :qlc.e()
     end
   end
 
   defp select(select, sources) do
     fields = fields(select, sources)
 
-    "[#{Enum.join(fields, ", ")}] || " <>
+    "{#{Enum.join(fields, ", ")}} || " <>
       (Enum.map(sources, fn ({table_name, _schema} = source) ->
         "#{record_pattern(source)} <- mnesia:table('#{table_name}')"
       end) |> Enum.join(", "))
@@ -57,6 +95,11 @@ defmodule Ecto.Adapters.Mnesia.Qlc do
     |> Enum.map(&Record.Attributes.to_erl_var(&1, source))
   end
 
+  defp field({{:., [], [{:&, [], [source_index]}, field]}, [], []}, sources) do
+    case Enum.at(sources, source_index) do
+      source -> Record.Attributes.to_erl_var(field, source)
+    end
+  end
   defp field({{_, _, [{:&, [], [source_index]}, field]}, [], []}, sources) do
     case Enum.at(sources, source_index) do
       source -> Record.Attributes.to_erl_var(field, source)
@@ -79,8 +122,7 @@ defmodule Ecto.Adapters.Mnesia.Qlc do
   end
 
   defp record_pattern(source) do
-    record_pattern_attributes = record_pattern_attributes(source)
-    "{#{Enum.join(record_pattern_attributes, ", ")}}"
+    "{#{Enum.join(record_pattern_attributes(source), ", ")}}"
   end
 
   defp record_pattern_attributes({table_name, _schema} = source) do
@@ -89,6 +131,7 @@ defmodule Ecto.Adapters.Mnesia.Qlc do
     |> List.insert_at(0, "Schema")
   end
 
+  defp to_qlc(true, _context), do: "true"
   defp to_qlc({field, value}, %{sources: [source]}) do
     erl_var = Record.Attributes.to_erl_var(field, source)
     "#{erl_var} == #{to_erl(value)}"

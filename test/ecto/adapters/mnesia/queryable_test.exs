@@ -133,14 +133,13 @@ defmodule Ecto.Adapters.MnesiaQueryableIntegrationTest do
         end)
       end)
 
-      {time, records} = :timer.tc(TestRepo, :all, [
+      records = TestRepo.all(
         from(s in TestSchema, where: s.field == "field 2")
-      ])
+      )
       assert Enum.all?(records, fn
         (%{field: "field 2"}) -> true
         _ -> false
       end)
-      assert time < 50_000
 
       :mnesia.clear_table(@table_name)
     end
@@ -365,6 +364,74 @@ defmodule Ecto.Adapters.MnesiaQueryableIntegrationTest do
             {:atomic, [{_, 3, "field 3"}]} -> assert true
             _ -> assert false
           end
+      end
+
+      :mnesia.clear_table(@table_name)
+    end
+
+    test "#all from one table with simple sort query, records" do
+      records = [
+        %TestSchema{id: 1, field: "field 2"},
+        %TestSchema{id: 2, field: "field 3"},
+        %TestSchema{id: 3, field: "field 1"}
+      ]
+      {:atomic, _result} = :mnesia.transaction(fn ->
+        Enum.map(records, fn (%{id: id, field: field}) ->
+          :mnesia.write(@table_name, {TestSchema, id, field}, :write)
+        end)
+      end)
+
+      case TestRepo.all(
+        from(s in TestSchema, order_by: [desc: :field])
+      ) do
+        [%{id: 2, field: "field 3"}, %{id: 1, field: "field 2"}, %{id: 3, field: "field 1"}] -> assert true
+        e -> assert e == false
+      end
+
+      :mnesia.clear_table(@table_name)
+    end
+
+    # NOTE not supported by the adapter yet need to explore the possibility of qlc sort function
+    @tag :skip
+    test "#all from one table with complex sort (multiple fields) query, records" do
+      records = [
+        %TestSchema{id: 1, field: "field 2"},
+        %TestSchema{id: 2, field: "field 2"},
+        %TestSchema{id: 3, field: "field 1"}
+      ]
+      {:atomic, _result} = :mnesia.transaction(fn ->
+        Enum.map(records, fn (%{id: id, field: field}) ->
+          :mnesia.write(@table_name, {TestSchema, id, field}, :write)
+        end)
+      end)
+
+      case TestRepo.all(
+        from(s in TestSchema, order_by: [desc: :id, desc: :field])
+      ) do
+        [%{id: 2, field: "field 2"}, %{id: 1, field: "field 2"}, %{id: 3, field: "field 2"}] -> assert true
+        e -> assert e == false
+      end
+
+      :mnesia.clear_table(@table_name)
+    end
+
+    test "#all from one table with simple limit query, records" do
+      records = [
+        %TestSchema{id: 1, field: "field 1"},
+        %TestSchema{id: 2, field: "field 2"},
+        %TestSchema{id: 3, field: "field 3"},
+      ]
+      {:atomic, _result} = :mnesia.transaction(fn ->
+        Enum.map(records, fn (%{id: id, field: field}) ->
+          :mnesia.write(@table_name, {TestSchema, id, field}, :write)
+        end)
+      end)
+
+      case TestRepo.all(
+        from(s in TestSchema, limit: 2)
+      ) do
+        [%{id: 1, field: "field 1"}, %{id: 2, field: "field 2"}] -> assert true
+        e -> assert e == false
       end
 
       :mnesia.clear_table(@table_name)

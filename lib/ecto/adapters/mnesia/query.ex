@@ -8,7 +8,17 @@ defmodule Ecto.Adapters.Mnesia.Query do
   alias Ecto.Query.SelectExpr
   require Qlc
 
-  defstruct type: nil, table_name: nil, schema: nil, sources: nil, fields: nil, qlc: nil, new_record: nil
+  defstruct [
+    type: nil,
+    table_name: nil,
+    schema: nil,
+    sources: nil,
+    fields: nil,
+    query: nil,
+    sort: nil,
+    answers: nil,
+    new_record: nil
+  ]
 
   @type t :: %__MODULE__{
     type: :all | :update_all | :delete_all,
@@ -16,20 +26,32 @@ defmodule Ecto.Adapters.Mnesia.Query do
     schema: atom(),
     sources: Keyword.t(),
     fields: (source :: tuple() -> list(atom())),
-    qlc: (params :: list() -> qlc_string :: String.t()),
+    query: (params :: list() -> query_handle :: :qlc.query_handle()),
+    sort: (query_handle :: :qlc.query_handle() -> query_handle :: :qlc.query_handle()),
+    answers: (query_handle :: :qlc.query_handle() -> list(tuple())),
     new_record: (tuple(), list() -> tuple())
   }
 
   @spec from_ecto_query(type :: atom(), ecto_query :: Ecto.Query.t()) :: mnesia_query :: %Ecto.Adapters.Mnesia.Query{}
   def from_ecto_query(
     type,
-    %Ecto.Query{select: select, joins: joins, sources: sources, wheres: wheres, updates: updates}
+    %Ecto.Query{
+      select: select,
+      joins: joins,
+      sources: sources,
+      wheres: wheres,
+      updates: updates,
+      order_bys: order_bys,
+      limit: limit
+    }
   ) do
     sources = sources(sources)
     {table_name, schema} = Enum.at(sources, 0)
 
     fields = fields(select, sources)
-    qlc = Mnesia.Qlc.build(select, joins, sources).(wheres)
+    query = Mnesia.Qlc.query(select, joins, sources).(wheres)
+    sort = Mnesia.Qlc.sort(order_bys, select, sources)
+    answers = Mnesia.Qlc.answers(limit)
     new_record = new_record({table_name, schema}, updates)
 
     %Mnesia.Query{
@@ -38,7 +60,9 @@ defmodule Ecto.Adapters.Mnesia.Query do
       schema: schema,
       sources: sources,
       fields: fields,
-      qlc: qlc,
+      query: query,
+      sort: sort,
+      answers: answers,
       new_record: new_record
     }
   end
