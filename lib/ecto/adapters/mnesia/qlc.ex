@@ -1,4 +1,6 @@
 defmodule Ecto.Adapters.Mnesia.Qlc do
+  require Qlc
+
   alias Ecto.Adapters.Mnesia.Table
   alias Ecto.Adapters.Mnesia.Record
   alias Ecto.Query.BooleanExpr
@@ -10,6 +12,7 @@ defmodule Ecto.Adapters.Mnesia.Qlc do
     desc: :descending
   }
 
+  @spec query(%SelectExpr{} | :all, any(), list(tuple())) :: (list() -> (params :: list() -> query_handle :: :qlc.query_handle()))
   def query(select, joins, sources) do
     select = select(select, sources)
     fn
@@ -22,7 +25,7 @@ defmodule Ecto.Adapters.Mnesia.Qlc do
           comprehension = [select, Enum.join(joins, ", "), Enum.join(qualifiers, ", ")]
           |> Enum.reject(fn (component) -> String.length(component) == 0 end)
           |> Enum.join(", ")
-          "[#{comprehension}]"
+          Qlc.q("[#{comprehension}]", [])
         end
       (filters) ->
         fn (params) ->
@@ -33,11 +36,12 @@ defmodule Ecto.Adapters.Mnesia.Qlc do
           comprehension = [select, Enum.join(joins, ", "), Enum.join(qualifiers, ", ")]
           |> Enum.reject(fn (component) -> String.length(component) == 0 end)
           |> Enum.join(", ")
-          "[#{comprehension}]"
+          Qlc.q("[#{comprehension}]", [])
         end
     end
   end
 
+  @spec sort(list(%QueryExpr{}), %SelectExpr{}, list(tuple())) :: (query_handle :: :qlc.query_handle() -> query_handle :: :qlc.query_handle())
   def sort([], _select, _sources) do
     fn (query) -> query end
   end
@@ -55,10 +59,11 @@ defmodule Ecto.Adapters.Mnesia.Qlc do
     end
   end
 
-  def next_answers(nil) do
+  @spec answers(%QueryExpr{} | nil) :: (query_handle :: :qlc.query_handle() -> list(tuple()))
+  def answers(nil) do
     fn (query) -> Qlc.e(query) end
   end
-  def next_answers(%QueryExpr{expr: limit}) do
+  def answers(%QueryExpr{expr: limit}) do
     fn (query) ->
       cursor = Qlc.cursor(query)
       :qlc.next_answers(cursor.c, limit)

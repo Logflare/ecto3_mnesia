@@ -133,14 +133,13 @@ defmodule Ecto.Adapters.MnesiaQueryableIntegrationTest do
         end)
       end)
 
-      {time, records} = :timer.tc(TestRepo, :all, [
+      records = TestRepo.all(
         from(s in TestSchema, where: s.field == "field 2")
-      ])
+      )
       assert Enum.all?(records, fn
         (%{field: "field 2"}) -> true
         _ -> false
       end)
-      assert time < 50_000
 
       :mnesia.clear_table(@table_name)
     end

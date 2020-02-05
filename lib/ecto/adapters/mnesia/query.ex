@@ -8,7 +8,17 @@ defmodule Ecto.Adapters.Mnesia.Query do
   alias Ecto.Query.SelectExpr
   require Qlc
 
-  defstruct type: nil, table_name: nil, schema: nil, sources: nil, fields: nil, qlc_query: nil, qlc_sort: nil, qlc_next_answers: nil, new_record: nil
+  defstruct [
+    type: nil,
+    table_name: nil,
+    schema: nil,
+    sources: nil,
+    fields: nil,
+    query: nil,
+    sort: nil,
+    answers: nil,
+    new_record: nil
+  ]
 
   @type t :: %__MODULE__{
     type: :all | :update_all | :delete_all,
@@ -16,7 +26,9 @@ defmodule Ecto.Adapters.Mnesia.Query do
     schema: atom(),
     sources: Keyword.t(),
     fields: (source :: tuple() -> list(atom())),
-    qlc_query: (params :: list() -> qlc_string :: String.t()),
+    query: (params :: list() -> query_handle :: :qlc.query_handle()),
+    sort: (query_handle :: :qlc.query_handle() -> query_handle :: :qlc.query_handle()),
+    answers: (query_handle :: :qlc.query_handle() -> list(tuple())),
     new_record: (tuple(), list() -> tuple())
   }
 
@@ -37,9 +49,9 @@ defmodule Ecto.Adapters.Mnesia.Query do
     {table_name, schema} = Enum.at(sources, 0)
 
     fields = fields(select, sources)
-    qlc_query = Mnesia.Qlc.query(select, joins, sources).(wheres)
-    qlc_sort = Mnesia.Qlc.sort(order_bys, select, sources)
-    qlc_next_answers = Mnesia.Qlc.next_answers(limit)
+    query = Mnesia.Qlc.query(select, joins, sources).(wheres)
+    sort = Mnesia.Qlc.sort(order_bys, select, sources)
+    answers = Mnesia.Qlc.answers(limit)
     new_record = new_record({table_name, schema}, updates)
 
     %Mnesia.Query{
@@ -48,9 +60,9 @@ defmodule Ecto.Adapters.Mnesia.Query do
       schema: schema,
       sources: sources,
       fields: fields,
-      qlc_query: qlc_query,
-      qlc_sort: qlc_sort,
-      qlc_next_answers: qlc_next_answers,
+      query: query,
+      sort: sort,
+      answers: answers,
       new_record: new_record
     }
   end
