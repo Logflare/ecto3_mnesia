@@ -20,7 +20,6 @@ defmodule Ecto.Adapters.Mnesia do
   end
 
   @impl Ecto.Adapter
-  def dumpers(:binary_id, type), do: [type, Ecto.UUID]
   def dumpers(_, type), do: [type]
 
 
@@ -66,7 +65,8 @@ defmodule Ecto.Adapters.Mnesia do
     end) do
       {:atomic, result} ->
         {length(result), result}
-      {:aborted, _} -> {0, nil}
+      {:aborted, e} ->
+        {0, []}
     end
   end
 
@@ -155,7 +155,7 @@ defmodule Ecto.Adapters.Mnesia do
     :mnesia.dirty_update_counter({Connection.id_seq_table_name(), :id}, 1)
   end
   def autogenerate(:embed_id), do: Ecto.UUID.generate()
-  def autogenerate(:binary_id), do: Ecto.UUID.bingenerate()
+  def autogenerate(:binary_id), do: Ecto.UUID.generate()
 
   @impl Ecto.Adapter.Schema
   def insert(
@@ -182,7 +182,7 @@ defmodule Ecto.Adapters.Mnesia do
 
     case :mnesia.transaction(fn ->
       with :ok <- :mnesia.write(table_name, record, :write) do
-        :mnesia.read(table_name, id)
+        [record]
       end
     end) do
       {:atomic, [record]} ->
