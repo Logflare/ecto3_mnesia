@@ -48,22 +48,22 @@ defmodule Ecto.Adapters.Mnesia.SchemaIntegrationTest do
       record_name: TestSchema,
       attributes: [:id, :field, :inserted_at, :updated_at],
       storage_properties: [ ets: [:compressed] ],
-      type: :set
+      type: :ordered_set
     ])
     :mnesia.create_table(@binary_id_table_name, [
       ram_copies: [node()],
       record_name: BinaryIdTestSchema,
       attributes: [:id, :field, :inserted_at, :updated_at],
       storage_properties: [ ets: [:compressed] ],
-      type: :set
+      type: :ordered_set
     ])
 
     :mnesia.wait_for_tables([@table_name, @binary_id_table_name], 1000)
   end
 
   describe "Ecto.Adapters.Schema#insert" do
-    test "Repo#insert valid record with [on_conflict: :replace_all]" do
-      case TestRepo.insert(%TestSchema{field: "field"}, on_conflict: :replace_all) do
+    test "Repo#insert valid record" do
+      case TestRepo.insert(%TestSchema{field: "field"}) do
         {:ok, %{id: id, field: "field"}} ->
           assert true
           {:atomic, [result]} = :mnesia.transaction(fn ->
@@ -78,13 +78,62 @@ defmodule Ecto.Adapters.Mnesia.SchemaIntegrationTest do
       :mnesia.clear_table(@table_name)
     end
 
-    test "Repo#insert valid record with binary id, [on_conflict: :replace_all]" do
-      case TestRepo.insert(%BinaryIdTestSchema{field: "field"}, on_conflict: :replace_all) do
+    test "Repo#insert valid record with existing record, [on_conflict: :replace_all]" do
+      id = 1
+      :mnesia.transaction(fn ->
+        :mnesia.write(@table_name, {TestSchema, id, "field", NaiveDateTime.utc_now(), NaiveDateTime.utc_now()}, :write)
+      end)
+
+      case TestRepo.insert(%TestSchema{id: id, field: "field"}, on_conflict: :replace_all) do
+        {:ok, %{id: id, field: "field"}} ->
+          assert true
+          {:atomic, [result]} = :mnesia.transaction(fn ->
+            :mnesia.read(@table_name, id)
+          end)
+
+          {TestSchema, ^id, field, _, _} = result
+          assert field == "field"
+        _ -> assert false
+      end
+
+      :mnesia.clear_table(@table_name)
+    end
+
+    test "Repo#insert valid record with existing record, [on_conflict: :raise]" do
+      id = 1
+      :mnesia.transaction(fn ->
+        :mnesia.write(@table_name, {TestSchema, id, "field", NaiveDateTime.utc_now(), NaiveDateTime.utc_now()}, :write)
+      end)
+
+      assert_raise Ecto.ConstraintError, fn ->
+        TestRepo.insert(%TestSchema{id: id, field: "field"}, on_conflict: :raise)
+      end
+
+      :mnesia.clear_table(@table_name)
+    end
+
+    test "Repo#insert valid record with existing record" do
+      id = 1
+      :mnesia.transaction(fn ->
+        :mnesia.write(@table_name, {TestSchema, id, "field", NaiveDateTime.utc_now(), NaiveDateTime.utc_now()}, :write)
+      end)
+
+      assert_raise Ecto.ConstraintError, fn ->
+        TestRepo.insert(%TestSchema{id: id, field: "field"})
+      end
+
+      :mnesia.clear_table(@table_name)
+    end
+
+    test "Repo#insert valid record with binary id" do
+      case TestRepo.insert(%BinaryIdTestSchema{field: "field"}) do
         {:ok, %{id: id, field: "field"}} ->
           assert true
 
 
-          %BinaryIdTestSchema{id: id, field: field} = TestRepo.get!(BinaryIdTestSchema, id)
+          {:atomic, [{_, id, field, _, _}]} = :mnesia.transaction(fn ->
+            :mnesia.read(@binary_id_table_name, id)
+          end)
           assert id =~ ~r([0-9a-fA-F]{8}\-[0-9a-fA-F]{4}\-[0-9a-fA-F]{4}\-[0-9a-fA-F]{4}\-[0-9a-fA-F]{12})
           assert field == "field"
         _ -> assert false
@@ -93,8 +142,8 @@ defmodule Ecto.Adapters.Mnesia.SchemaIntegrationTest do
       :mnesia.clear_table(@binary_id_table_name)
     end
 
-    test "Repo#insert valid record with [on_conflict: :replace_all] and returning opt" do
-      case TestRepo.insert(%TestSchema{field: "field"}, on_conflict: :replace_all, returning: [:id, :field]) do
+    test "Repo#insert valid record with returning opt" do
+      case TestRepo.insert(%TestSchema{field: "field"}, returning: [:id, :field]) do
         {:ok, %{id: id, field: "field"}} ->
           assert true
           {:atomic, [result]} = :mnesia.transaction(fn ->
@@ -110,11 +159,10 @@ defmodule Ecto.Adapters.Mnesia.SchemaIntegrationTest do
   end
 
   describe "Ecto.Adapters.Schema#insert_all" do
-    test "Repo#insert_all valid records with [on_conflict: :replace_all]" do
+    test "Repo#insert_all valid records" do
       case TestRepo.insert_all(
         TestSchema,
         [%{field: "field 1"}, %{field: "field 2"}],
-        on_conflict: :replace_all,
         returning: [:id]
       ) do
         {count, _records} ->
@@ -135,11 +183,10 @@ defmodule Ecto.Adapters.Mnesia.SchemaIntegrationTest do
       :mnesia.clear_table(@table_name)
     end
 
-    test "Repo#insert_all valid records with [on_conflict: :replace_all] and returning opt" do
+    test "Repo#insert_all valid records with returning opt" do
       case TestRepo.insert_all(
         TestSchema,
         [%{field: "field 1"}, %{field: "field 2"}],
-        on_conflict: :replace_all,
         returning: [:id]
       ) do
         {count, records} ->
@@ -161,11 +208,10 @@ defmodule Ecto.Adapters.Mnesia.SchemaIntegrationTest do
       :mnesia.clear_table(@table_name)
     end
 
-    test "Repo#insert_all valid records with binary ids, [on_conflict: :replace_all] and returning opt" do
+    test "Repo#insert_all valid records with binary ids returning opt" do
       case TestRepo.insert_all(
         BinaryIdTestSchema,
         [%{field: "field 1"}, %{field: "field 2"}],
-        on_conflict: :replace_all,
         returning: [:id, :field]
       ) do
         {count, records} ->
