@@ -195,6 +195,6 @@ defmodule Ecto.Adapters.Mnesia.Qlc do
   end
 
   defp to_erl(values) when is_list(values), do: Enum.map(values, &to_erl(&1))
-  defp to_erl(value) when is_binary(value), do: ~s(<<"#{value}">>)
+  defp to_erl(value) when is_binary(value), do: inspect(value, binaries: :as_binaries)
   defp to_erl(value), do: value
 end

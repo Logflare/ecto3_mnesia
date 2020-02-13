@@ -13,6 +13,9 @@ defmodule Ecto.Adapters.Mnesia.Connection do
   @impl GenServer
   def init(config) do
     Process.flag(:trap_exit, true)
+    :mnesia.stop()
+    :mnesia.create_schema([node()])
+    :mnesia.start()
     ensure_id_seq_table(config[:nodes])
 
     {:ok, config}

@@ -20,7 +20,6 @@ defmodule Ecto.Adapters.Mnesia do
   end
 
   @impl Ecto.Adapter
-  def dumpers(:binary_id, type), do: [type, Ecto.UUID]
   def dumpers(_, type), do: [type]
 
 
@@ -66,7 +65,8 @@ defmodule Ecto.Adapters.Mnesia do
     end) do
       {:atomic, result} ->
         {length(result), result}
-      {:aborted, _} -> {0, nil}
+      {:aborted, _} ->
+        {0, []}
     end
   end
 
@@ -155,22 +155,17 @@ defmodule Ecto.Adapters.Mnesia do
     :mnesia.dirty_update_counter({Connection.id_seq_table_name(), :id}, 1)
   end
   def autogenerate(:embed_id), do: Ecto.UUID.generate()
-  def autogenerate(:binary_id), do: Ecto.UUID.bingenerate()
+  def autogenerate(:binary_id), do: Ecto.UUID.generate()
 
   @impl Ecto.Adapter.Schema
   def insert(
     _adapter_meta,
     %{schema: schema, source: source, autogenerate_id: autogenerate_id},
     params,
-    _on_conflict,
+    on_conflict,
     returning,
-    opts
+    _opts
   ) do
-    if opts[:on_conflict] != :replace_all do
-      # TODO manage others `on_conflict` configurations
-      raise "only [on_conflict: :replace_all] is supported by the adapter"
-    end
-
     table_name = String.to_atom(source)
     context = [
       table_name: table_name,
@@ -181,8 +176,17 @@ defmodule Ecto.Adapters.Mnesia do
     id = elem(record, 1)
 
     case :mnesia.transaction(fn ->
-      with :ok <- :mnesia.write(table_name, record, :write) do
-        :mnesia.read(table_name, id)
+      case on_conflict do
+        {:raise, _, _} ->
+          with [] <- :mnesia.read(table_name, id, :read),
+               :ok <- :mnesia.write(table_name, record, :write) do
+            [record]
+          else
+            [_record] ->
+              :mnesia.abort("Record already exists")
+          end
+        {_, _, _} ->
+          with :ok <- :mnesia.write(table_name, record, :write), do: [record]
       end
     end) do
       {:atomic, [record]} ->
@@ -192,7 +196,7 @@ defmodule Ecto.Adapters.Mnesia do
         end)
         {:ok, result}
       {:aborted, error} ->
-        {:invalid, [mnesia: "#{inspect(error)}"]}
+        {:invalid, [mnesia: inspect(error)]}
     end
   end
 
@@ -202,15 +206,10 @@ defmodule Ecto.Adapters.Mnesia do
     %{schema: schema, source: source, autogenerate_id: autogenerate_id},
     _header,
     records,
-    _on_conflict,
+    on_conflict,
     returning,
-    opts
+    _opts
   ) do
-    if opts[:on_conflict] != :replace_all do
-      # TODO manage others `on_conflict` configurations
-      raise "only [on_conflict: :replace_all] is supported by the adapter"
-    end
-
     table_name = String.to_atom(source)
     context = [
       table_name: table_name,
@@ -222,8 +221,17 @@ defmodule Ecto.Adapters.Mnesia do
       Enum.map(records, fn (params) ->
         record = Record.build(params, context)
         id = elem(record, 1)
-        with :ok <- :mnesia.write(table_name, record, :write) do
-          :mnesia.read(table_name, id)
+        case on_conflict do
+          {:raise, _, _} ->
+            with [] <- :mnesia.read(table_name, id, :read),
+                 :ok <- :mnesia.write(table_name, record, :write) do
+              [record]
+            else
+              [_record] ->
+                :mnesia.abort("Record already exists")
+            end
+          {_, _, _} ->
+            with :ok <- :mnesia.write(table_name, record, :write), do: [record]
         end
       end)
     end) do
