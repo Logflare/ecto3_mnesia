@@ -83,7 +83,6 @@ defmodule Ecto.Adapters.Mnesia do
     {:nocache,
       %Mnesia.Query{
         type: :update_all,
-        table_name: table_name,
         sources: sources,
         query: query,
         answers: answers,
@@ -93,6 +92,8 @@ defmodule Ecto.Adapters.Mnesia do
     params,
     _opts
   ) do
+    {table_name, _schema} = Enum.at(sources, 0)
+
     case :timer.tc(:mnesia, :transaction, [fn ->
       query.(params)
       |> answers.()
@@ -122,7 +123,6 @@ defmodule Ecto.Adapters.Mnesia do
       %Mnesia.Query{
         type: :delete_all,
         sources: sources,
-        table_name: table_name,
         query: query,
         answers: answers
       }
@@ -130,6 +130,8 @@ defmodule Ecto.Adapters.Mnesia do
     params,
     _opts
   ) do
+    {table_name, _schema} = Enum.at(sources, 0)
+
     case :timer.tc(:mnesia, :transaction, [fn ->
       query.(params)
       |> answers.()
