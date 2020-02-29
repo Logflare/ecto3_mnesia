@@ -87,8 +87,13 @@ end
 ## Tests
 You can run the tests as any mix package running
 ```
+<<<<<<< HEAD
 git clone https://gitlab.com/patatoid/ecto3_mnesia.git
 cd ecto3_mnesia
+=======
+git clone https://gitlab.com/patatoid/ecto_mnesia.git
+cd ecto_mnesia
+>>>>>>> documentation
 mix deps.get
 mix test --trace
 ```
