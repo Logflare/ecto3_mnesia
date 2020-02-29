@@ -1,5 +1,5 @@
 # Ecto Mnesia Adapter
-This adapter bring the strength of Ecto to Mnesia providing validation, and persistance layer to interact with the database.
+This adapter bring the strength of Ecto providing validation, and persistance layer to interact to Mnesia databases.
 
 Mnesia is Distributed Database Management System shipped with Erlang runtime. Be aware of strengths and weaknesses listed in [erlang documentation](https://erlang.org/doc/man/mnesia.html) before thinking about using it.
 
@@ -69,7 +69,7 @@ IO.inspect :mnesia.create_table(:table_name, [
 ```
 Then run the script with mix `mix run ./priv/repo/mnesia_migration.exs`
 
-Notice that the table before MUST be difined according to the defined Ecto schema
+Notice that the table before MUST be defined according to the corresponding schema
 ```
 defmodule MyApp.Context.Schema do
   ...
