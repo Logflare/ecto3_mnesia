@@ -10,6 +10,11 @@ defmodule EctoMnesia.MixProject do
       deps: deps(),
       dialyzer: [
         plt_add_apps: [:mnesia],
+      ],
+      source_url: "https://gitlab.com/patatoid/ecto_mnesia",
+      docs: [
+        main: "Ecto.Adapters.Mnesia",
+        extras: ["README.md"]
       ]
     ]
   end
@@ -24,6 +29,7 @@ defmodule EctoMnesia.MixProject do
     [
       {:ecto, "~> 3.0"},
       {:qlc, "~> 1.0"},
+      {:ex_doc, "~> 0.21", only: :dev, runtime: false},
       {:dialyxir, "~> 1.0.0-rc.7", only: [:dev], runtime: false}
     ]
   end

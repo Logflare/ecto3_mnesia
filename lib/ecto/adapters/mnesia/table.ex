@@ -1,4 +1,5 @@
 defmodule Ecto.Adapters.Mnesia.Table do
+  @moduledoc false
   @spec record_field_index(
     attribute :: atom(),
     table_name :: atom()

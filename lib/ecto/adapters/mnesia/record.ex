@@ -1,4 +1,5 @@
 defmodule Ecto.Adapters.Mnesia.Record do
+  @moduledoc false
   import Ecto.Adapters.Mnesia.Table, only: [
     attributes: 1,
     field_index: 2,
@@ -78,6 +79,7 @@ defmodule Ecto.Adapters.Mnesia.Record do
   end
 
   defmodule Attributes do
+    @moduledoc false
     import Ecto.Adapters.Mnesia.Table, only: [
       record_field_index: 2,
     ]

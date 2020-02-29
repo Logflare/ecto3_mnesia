@@ -1,4 +1,5 @@
 defmodule Ecto.Adapters.Mnesia.Qlc do
+  @moduledoc false
   require Qlc
 
   alias Ecto.Adapters.Mnesia.Table
