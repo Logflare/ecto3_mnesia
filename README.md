@@ -71,7 +71,11 @@ IO.inspect :mnesia.create_table(:table_name, [
 ```
 Then run the script with mix `mix run ./priv/repo/mnesia_migration.exs`
 
+<<<<<<< HEAD
 Notice that the table before MUST be defined according to the corresponding schema
+=======
+Notice that the table before MUST be difined according to the defined Ecto schema
+>>>>>>> documentation
 ```
 defmodule MyApp.Context.Schema do
   ...
@@ -87,8 +91,13 @@ end
 ## Tests
 You can run the tests as any mix package running
 ```
+<<<<<<< HEAD
 git clone https://gitlab.com/patatoid/ecto3_mnesia.git
 cd ecto3_mnesia
+=======
+git clone https://gitlab.com/patatoid/ecto_mnesia.git
+cd ecto_mnesia
+>>>>>>> documentation
 mix deps.get
 mix test --trace
 ```
