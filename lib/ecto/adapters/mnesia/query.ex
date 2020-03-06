@@ -1,11 +1,11 @@
 defmodule Ecto.Adapters.Mnesia.Query do
+  @moduledoc false
   import Ecto.Adapters.Mnesia.Table, only: [
     record_field_index: 2
   ]
 
   alias Ecto.Adapters.Mnesia
   alias Ecto.Query.QueryExpr
-  alias Ecto.Query.SelectExpr
   require Qlc
 
   defstruct [

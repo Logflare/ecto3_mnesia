@@ -1,4 +1,5 @@
 defmodule Ecto.Adapters.Mnesia.Connection do
+  @moduledoc false
   use GenServer
 
   alias Ecto.Adapters.Mnesia
