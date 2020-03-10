@@ -3,6 +3,7 @@ defmodule EctoMnesia.MixProject do
 
   def project do
     [
+      name: "Ecto3 Mnesia",
       app: :ecto3_mnesia,
       version: "0.1.0",
       elixir: "~> 1.9",
@@ -12,6 +13,8 @@ defmodule EctoMnesia.MixProject do
         plt_add_apps: [:mnesia],
       ],
       source_url: "https://gitlab.com/patatoid/ecto3_mnesia",
+      description: description(),
+      package: package(),
       docs: [
         main: "Ecto.Adapters.Mnesia",
         extras: ["README.md"]
@@ -32,5 +35,21 @@ defmodule EctoMnesia.MixProject do
       {:ex_doc, "~> 0.21", only: :dev, runtime: false},
       {:dialyxir, "~> 1.0.0-rc.7", only: [:dev], runtime: false}
     ]
+  end
+
+  defp package do
+    %{
+      name: "ecto3_mnesia",
+      licenses: ["MIT"],
+      links: %{
+        "Gitlab" => "https://gitlab.com/patatoid/ecto3_mnesia"
+      }
+    }
+  end
+
+  defp description do
+    """
+    Mnesia adapter for Ecto 3
+    """
   end
 end
