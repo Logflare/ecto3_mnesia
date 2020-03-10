@@ -20,7 +20,7 @@ erl_crash.dump
 *.ez
 
 # Ignore package tarball (built via "mix hex.build").
-ecto_mnesia-*.tar
+ecto3_mnesia-*.tar
 
 # Mnesia files
 /Mnesia.nonode@nohost

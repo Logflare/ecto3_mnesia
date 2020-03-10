@@ -11,7 +11,7 @@ defmodule EctoMnesia.MixProject do
       dialyzer: [
         plt_add_apps: [:mnesia],
       ],
-      source_url: "https://gitlab.com/patatoid/ecto_mnesia",
+      source_url: "https://gitlab.com/patatoid/ecto3_mnesia",
       docs: [
         main: "Ecto.Adapters.Mnesia",
         extras: ["README.md"]

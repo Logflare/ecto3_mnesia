@@ -17,7 +17,7 @@ defmodule Ecto.Adapters.Mnesia do
   - [x] Limit queries
   - [x] Sort by one field
   - [ ] Sort by multiple fields
- - [x] One level joins
+  - [x] One level joins
   - [ ] Deeper joins
 
   2. Writing operations
