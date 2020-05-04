@@ -15,7 +15,7 @@ defmodule Ecto.Adapters.Mnesia.Connection do
   def init(config) do
     Process.flag(:trap_exit, true)
     :mnesia.stop()
-    :mnesia.create_schema([node()])
+    :mnesia.create_schema(config[:nodes] || [node()])
     :mnesia.start()
     ensure_id_seq_table(config[:nodes])
 

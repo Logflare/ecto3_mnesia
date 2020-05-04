@@ -258,10 +258,8 @@ defmodule Ecto.Adapters.Mnesia do
 
   @impl Ecto.Adapter.Schema
   def autogenerate(:id) do
-    # NOTE /!\ need to call :dets.close/1 on shutdown to close properly table in order to keep state
     :mnesia.dirty_update_counter({Connection.id_seq_table_name(), :id}, 1)
   end
-  def autogenerate(:embed_id), do: Ecto.UUID.generate()
   def autogenerate(:binary_id), do: Ecto.UUID.generate()
 
   @impl Ecto.Adapter.Schema

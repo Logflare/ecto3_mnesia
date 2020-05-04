@@ -96,11 +96,6 @@ defmodule Ecto.Adapters.Mnesia.Qlc do
     |> Enum.map(&Record.Attributes.to_erl_var(&1, source))
   end
 
-  defp field({{:., [], [{:&, [], [source_index]}, field]}, [], []}, sources) do
-    case Enum.at(sources, source_index) do
-      source -> Record.Attributes.to_erl_var(field, source)
-    end
-  end
   defp field({{_, _, [{:&, [], [source_index]}, field]}, [], []}, sources) do
     case Enum.at(sources, source_index) do
       source -> Record.Attributes.to_erl_var(field, source)
