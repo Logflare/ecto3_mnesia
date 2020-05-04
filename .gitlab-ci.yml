@@ -1,5 +1,6 @@
 stages:
   - test
+  - deploy
 
 test:
   stage: test
@@ -13,9 +14,25 @@ test:
   - mix local.rebar --force
   - mix deps.get
   script:
-  - mix test --trace
+  - mix test --trace --cover
   variables:
     MIX_ENV: test
+  artifacts:
+    paths:
+      - cover/
+
+pages:
+  stage: deploy
+  dependencies:
+    - test
+  script:
+    - mv cover/ public/
+  artifacts:
+    expire_in: 30 days
+    paths:
+      - public
+  only:
+    - master
 
 dialyzer:
   stage: test

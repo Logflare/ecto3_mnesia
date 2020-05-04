@@ -1,3 +1,5 @@
+[![pipeline status](https://gitlab.com/patatoid/ecto3_mnesia/badges/master/pipeline.svg)](https://gitlab.com/patatoid/ecto3_mnesia/-/commits/master)
+[![coverage report](https://gitlab.com/patatoid/ecto3_mnesia/badges/master/coverage.svg)](https://gitlab.com/patatoid/ecto3_mnesia/-/commits/master)
 # Ecto Mnesia Adapter
 This adapter bring the strength of Ecto providing validation, and persistance layer to interact to Mnesia databases.
 
