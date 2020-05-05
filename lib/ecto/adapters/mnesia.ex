@@ -378,7 +378,7 @@ defmodule Ecto.Adapters.Mnesia do
         query.(params) |> Mnesia.Qlc.answers(nil).()
     end]),
       {updateTime, {:atomic, update}} <- :timer.tc(:mnesia, :transaction, [fn ->
-        update = List.zip([Table.attributes(table_name), attributes])
+        update = List.zip([schema.__schema__(:fields), attributes])
                  |> Record.build(context)
                  |> Record.put_change(params, context)
 
