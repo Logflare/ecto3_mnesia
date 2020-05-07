@@ -144,10 +144,11 @@ defmodule Ecto.Adapters.Mnesia do
     params,
     _opts
   ) do
+    context = [params: params]
     case :timer.tc(:mnesia, :transaction, [fn ->
       query.(params)
       |> sort.()
-      |> answers.()
+      |> answers.(context)
       |> Enum.map(&Tuple.to_list(&1))
     end]) do
       {time, {:atomic, result}} ->
@@ -177,10 +178,11 @@ defmodule Ecto.Adapters.Mnesia do
     _opts
   ) do
     {table_name, _schema} = Enum.at(sources, 0)
+    context = [params: params]
 
     case :timer.tc(:mnesia, :transaction, [fn ->
       query.(params)
-      |> answers.()
+      |> answers.(context)
       |> Enum.map(&Tuple.to_list(&1))
       |> Enum.map(fn (record) -> new_record.(record, params) end)
       |> Enum.map(fn (record) ->
@@ -215,10 +217,11 @@ defmodule Ecto.Adapters.Mnesia do
     _opts
   ) do
     {table_name, _schema} = Enum.at(sources, 0)
+    context = [params: params]
 
     case :timer.tc(:mnesia, :transaction, [fn ->
       query.(params)
-      |> answers.()
+      |> answers.(context)
       |> Enum.map(&Tuple.to_list(&1))
       |> Enum.map(fn (record) ->
         :mnesia.delete(table_name, List.first(record), :write)
@@ -371,11 +374,11 @@ defmodule Ecto.Adapters.Mnesia do
   ) do
     table_name = String.to_atom(source)
     source = {table_name, schema}
-    context = [table_name: table_name, schema: schema, autogenerate_id: autogenerate_id]
+    context = [table_name: table_name, schema: schema, autogenerate_id: autogenerate_id, params: params]
 
     query = Mnesia.Qlc.query(:all, [], [source]).(filters)
     with {selectTime, {:atomic, [attributes]}} <- :timer.tc(:mnesia, :transaction, [fn ->
-        query.(params) |> Mnesia.Qlc.answers(nil).()
+        query.(params) |> Mnesia.Qlc.answers(nil, nil).(context)
     end]),
       {updateTime, {:atomic, update}} <- :timer.tc(:mnesia, :transaction, [fn ->
         update = List.zip([schema.__schema__(:fields), attributes])
@@ -417,7 +420,7 @@ defmodule Ecto.Adapters.Mnesia do
 
     query = Mnesia.Qlc.query(:all, [], [source]).(filters)
     with {selectTime, {:atomic, [[id|_t]]}} <- :timer.tc(:mnesia, :transaction, [fn ->
-        query.([]) |> Mnesia.Qlc.answers(nil).()
+        query.([]) |> Mnesia.Qlc.answers(nil, nil).([params: []])
         |> Enum.map(&Tuple.to_list(&1))
     end]),
       {deleteTime, {:atomic, :ok}} <- :timer.tc(:mnesia, :transaction, [fn ->

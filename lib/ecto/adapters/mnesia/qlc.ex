@@ -60,12 +60,20 @@ defmodule Ecto.Adapters.Mnesia.Qlc do
     end
   end
 
-  @spec answers(%QueryExpr{} | nil) :: (query_handle :: :qlc.query_handle() -> list(tuple()))
+  @spec answers(%QueryExpr{} | nil) :: (query_handle :: :qlc.query_handle(), context :: Keyword.t() -> list(tuple()))
   def answers(nil) do
-    fn (query) -> Qlc.e(query) end
+    fn (query, _context) -> Qlc.e(query) end
   end
-  def answers(%QueryExpr{expr: limit}) do
-    fn (query) ->
+  def answers(%QueryExpr{expr: limit}) when is_integer(limit) do
+    fn (query, _context) ->
+      cursor = Qlc.cursor(query)
+      :qlc.next_answers(cursor.c, limit)
+      |> :qlc.e()
+    end
+  end
+  def answers(%QueryExpr{expr:  {:^, [], [param_index]}}) do
+    fn (query, context) ->
+      limit = Enum.at(context[:params], param_index)
       cursor = Qlc.cursor(query)
       :qlc.next_answers(cursor.c, limit)
       |> :qlc.e()

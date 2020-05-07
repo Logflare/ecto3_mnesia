@@ -22,7 +22,7 @@ defmodule Ecto.Adapters.Mnesia.Query do
     sources: Keyword.t(),
     query: (params :: list() -> query_handle :: :qlc.query_handle()),
     sort: (query_handle :: :qlc.query_handle() -> query_handle :: :qlc.query_handle()),
-    answers: (query_handle :: :qlc.query_handle() -> list(tuple())),
+    answers: (query_handle :: :qlc.query_handle(), context :: Keyword.t() -> list(tuple())),
     new_record: (tuple(), list() -> tuple())
   }
 
