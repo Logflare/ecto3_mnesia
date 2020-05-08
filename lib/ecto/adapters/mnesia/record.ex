@@ -27,7 +27,8 @@ defmodule Ecto.Adapters.Mnesia.Record do
   def build(params, context) do
     table_name = context[:table_name]
     schema = context[:schema]
-    {key, _source, type} = context[:autogenerate_id]
+
+    {key, _source, type} = context[:autogenerate_id] || {nil, nil, nil}
 
     attributes(table_name)
     |> Enum.map(fn
@@ -80,22 +81,8 @@ defmodule Ecto.Adapters.Mnesia.Record do
 
   defmodule Attributes do
     @moduledoc false
-    import Ecto.Adapters.Mnesia.Table, only: [
-      record_field_index: 2,
-    ]
 
     @type t :: list()
-
-    @spec to_schema_attributes(record_attributes :: list(), context :: Keyword.t()) :: schema_attributes :: list()
-    def to_schema_attributes(record_attributes, context) do
-      {table_name, _schema} = source = context[:source]
-      fields = context[:fields]
-
-      fields.(source)
-      |> Enum.map(fn (field) ->
-        Enum.at(record_attributes, record_field_index(field, table_name))
-      end)
-    end
 
     @spec to_erl_var(attribute :: atom(), source :: tuple()) :: erl_var :: String.t()
     def to_erl_var(attribute, {_table_name, schema}) do

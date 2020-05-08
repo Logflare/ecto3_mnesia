@@ -2,8 +2,8 @@ defmodule Ecto.Adapters.Mnesia.Qlc do
   @moduledoc false
   require Qlc
 
-  alias Ecto.Adapters.Mnesia.Table
   alias Ecto.Adapters.Mnesia.Record
+  alias Ecto.Adapters.Mnesia.Table
   alias Ecto.Query.BooleanExpr
   alias Ecto.Query.QueryExpr
   alias Ecto.Query.SelectExpr
@@ -60,17 +60,31 @@ defmodule Ecto.Adapters.Mnesia.Qlc do
     end
   end
 
-  @spec answers(%QueryExpr{} | nil) :: (query_handle :: :qlc.query_handle() -> list(tuple()))
-  def answers(nil) do
-    fn (query) -> Qlc.e(query) end
-  end
-  def answers(%QueryExpr{expr: limit}) do
-    fn (query) ->
+  @spec answers(limit :: %QueryExpr{} | nil, offset :: %QueryExpr{} | nil) :: (query_handle :: :qlc.query_handle(), context :: Keyword.t() -> list(tuple()))
+  def answers(limit, offset) do
+    fn (query, context) ->
+      limit = unbind_limit(limit, context)
+      offset = unbind_offset(offset, context)
       cursor = Qlc.cursor(query)
+      if offset > 0 do
+        :qlc.next_answers(cursor.c, offset)
+      end
       :qlc.next_answers(cursor.c, limit)
       |> :qlc.e()
     end
   end
+
+  defp unbind_limit(nil, _context), do: :all_remaining
+  defp unbind_limit(%QueryExpr{expr:  {:^, [], [param_index]}}, context) do
+    Enum.at(context[:params], param_index)
+  end
+  defp unbind_limit(%QueryExpr{expr:  limit}, _context) when is_integer(limit), do: limit
+
+  defp unbind_offset(nil, _context), do: 0
+  defp unbind_offset(%QueryExpr{expr:  {:^, [], [param_index]}}, context) do
+    Enum.at(context[:params], param_index)
+  end
+  defp unbind_offset(%QueryExpr{expr:  offset}, _context) when is_integer(offset), do: offset
 
   defp select(select, sources) do
     fields = fields(select, sources)
@@ -96,11 +110,6 @@ defmodule Ecto.Adapters.Mnesia.Qlc do
     |> Enum.map(&Record.Attributes.to_erl_var(&1, source))
   end
 
-  defp field({{:., [], [{:&, [], [source_index]}, field]}, [], []}, sources) do
-    case Enum.at(sources, source_index) do
-      source -> Record.Attributes.to_erl_var(field, source)
-    end
-  end
   defp field({{_, _, [{:&, [], [source_index]}, field]}, [], []}, sources) do
     case Enum.at(sources, source_index) do
       source -> Record.Attributes.to_erl_var(field, source)

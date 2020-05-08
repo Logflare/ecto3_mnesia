@@ -22,7 +22,7 @@ defmodule Ecto.Adapters.Mnesia.Query do
     sources: Keyword.t(),
     query: (params :: list() -> query_handle :: :qlc.query_handle()),
     sort: (query_handle :: :qlc.query_handle() -> query_handle :: :qlc.query_handle()),
-    answers: (query_handle :: :qlc.query_handle() -> list(tuple())),
+    answers: (query_handle :: :qlc.query_handle(), context :: Keyword.t() -> list(tuple())),
     new_record: (tuple(), list() -> tuple())
   }
 
@@ -37,13 +37,14 @@ defmodule Ecto.Adapters.Mnesia.Query do
       wheres: wheres,
       updates: updates,
       order_bys: order_bys,
-      limit: limit
+      limit: limit,
+      offset: offset
     }
   ) do
     sources = sources(sources)
     query = Mnesia.Qlc.query(select, joins, sources).(wheres)
     sort = Mnesia.Qlc.sort(order_bys, select, sources)
-    answers = Mnesia.Qlc.answers(limit)
+    answers = Mnesia.Qlc.answers(limit, offset)
     new_record = new_record(Enum.at(sources, 0), updates)
 
     %Mnesia.Query{
