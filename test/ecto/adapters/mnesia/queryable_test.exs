@@ -437,7 +437,7 @@ defmodule Ecto.Adapters.MnesiaQueryableIntegrationTest do
       :mnesia.clear_table(@table_name)
     end
 
-    test "#all from one table with simple limit query (binding), records" do
+    test "#all from one table with limit query (binding), records" do
       records = [
         %TestSchema{id: 1, field: "field 1"},
         %TestSchema{id: 2, field: "field 2"},
@@ -454,6 +454,73 @@ defmodule Ecto.Adapters.MnesiaQueryableIntegrationTest do
         from(s in TestSchema, limit: ^limit)
       ) do
         [%{id: 1, field: "field 1"}, %{id: 2, field: "field 2"}] -> assert true
+        e -> assert e == false
+      end
+
+      :mnesia.clear_table(@table_name)
+    end
+
+    test "#all from one table with simple offset query, records" do
+      records = [
+        %TestSchema{id: 1, field: "field 1"},
+        %TestSchema{id: 2, field: "field 2"},
+        %TestSchema{id: 3, field: "field 3"},
+      ]
+      {:atomic, _result} = :mnesia.transaction(fn ->
+        Enum.map(records, fn (%{id: id, field: field}) ->
+          :mnesia.write(@table_name, {TestSchema, id, field}, :write)
+        end)
+      end)
+
+      case TestRepo.all(
+        from(s in TestSchema, offset: 2)
+      ) do
+        [%{id: 3, field: "field 3"}] -> assert true
+        e -> assert e == false
+      end
+
+      :mnesia.clear_table(@table_name)
+    end
+
+    test "#all from one table with offset query (binding), records" do
+      records = [
+        %TestSchema{id: 1, field: "field 1"},
+        %TestSchema{id: 2, field: "field 2"},
+        %TestSchema{id: 3, field: "field 3"},
+      ]
+      {:atomic, _result} = :mnesia.transaction(fn ->
+        Enum.map(records, fn (%{id: id, field: field}) ->
+          :mnesia.write(@table_name, {TestSchema, id, field}, :write)
+        end)
+      end)
+      offset = 2
+
+      case TestRepo.all(
+        from(s in TestSchema, offset: ^offset)
+      ) do
+        [%{id: 3, field: "field 3"}] -> assert true
+        e -> assert e == false
+      end
+
+      :mnesia.clear_table(@table_name)
+    end
+
+    test "#all from one table with limit and offset query, records" do
+      records = [
+        %TestSchema{id: 1, field: "field 1"},
+        %TestSchema{id: 2, field: "field 2"},
+        %TestSchema{id: 3, field: "field 3"},
+      ]
+      {:atomic, _result} = :mnesia.transaction(fn ->
+        Enum.map(records, fn (%{id: id, field: field}) ->
+          :mnesia.write(@table_name, {TestSchema, id, field}, :write)
+        end)
+      end)
+
+      case TestRepo.all(
+        from(s in TestSchema, limit: 1, offset: 1)
+      ) do
+        [%{id: 2, field: "field 2"}] -> assert true
         e -> assert e == false
       end
 

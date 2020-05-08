@@ -60,25 +60,31 @@ defmodule Ecto.Adapters.Mnesia.Qlc do
     end
   end
 
-  @spec answers(%QueryExpr{} | nil) :: (query_handle :: :qlc.query_handle(), context :: Keyword.t() -> list(tuple()))
-  def answers(nil) do
-    fn (query, _context) -> Qlc.e(query) end
-  end
-  def answers(%QueryExpr{expr: limit}) when is_integer(limit) do
-    fn (query, _context) ->
-      cursor = Qlc.cursor(query)
-      :qlc.next_answers(cursor.c, limit)
-      |> :qlc.e()
-    end
-  end
-  def answers(%QueryExpr{expr:  {:^, [], [param_index]}}) do
+  @spec answers(limit :: %QueryExpr{} | nil, offset :: %QueryExpr{} | nil) :: (query_handle :: :qlc.query_handle(), context :: Keyword.t() -> list(tuple()))
+  def answers(limit, offset) do
     fn (query, context) ->
-      limit = Enum.at(context[:params], param_index)
+      limit = unbind_limit(limit, context)
+      offset = unbind_offset(offset, context)
       cursor = Qlc.cursor(query)
+      if offset do
+        :qlc.next_answers(cursor.c, offset)
+      end
       :qlc.next_answers(cursor.c, limit)
       |> :qlc.e()
     end
   end
+
+  defp unbind_limit(nil, context), do: :all_remaining
+  defp unbind_limit(%QueryExpr{expr:  {:^, [], [param_index]}}, context) do
+    Enum.at(context[:params], param_index)
+  end
+  defp unbind_limit(%QueryExpr{expr:  limit}, context) when is_integer(limit), do: limit
+
+  defp unbind_offset(nil, context), do: false
+  defp unbind_offset(%QueryExpr{expr:  {:^, [], [param_index]}}, context) do
+    Enum.at(context[:params], param_index)
+  end
+  defp unbind_offset(%QueryExpr{expr:  offset}, context) when is_integer(offset), do: offset
 
   defp select(select, sources) do
     fields = fields(select, sources)
