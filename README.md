@@ -14,7 +14,7 @@ Mnesia is Distributed Database Management System shipped with Erlang runtime. Be
 - [x] and/or/in in where clauses
 - [x] Bindings
 - [ ] Fragments
-- [x] Limit queries
+- [x] Limit/Offset queries
 - [x] Sort by one field
 - [ ] Sort by multiple fields
 - [x] One level joins
@@ -87,13 +87,8 @@ end
 ## Tests
 You can run the tests as any mix package running
 ```
-<<<<<<< HEAD
 git clone https://gitlab.com/patatoid/ecto3_mnesia.git
 cd ecto3_mnesia
-=======
-git clone https://gitlab.com/patatoid/ecto_mnesia.git
-cd ecto_mnesia
->>>>>>> documentation
 mix deps.get
 mix test --trace
 ```

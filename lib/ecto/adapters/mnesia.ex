@@ -14,7 +14,7 @@ defmodule Ecto.Adapters.Mnesia do
   - [x] and/or/in in where clauses
   - [x] Bindings
   - [ ] Fragments
-  - [x] Limit queries
+  - [x] Limit/Offset queries
   - [x] Sort by one field
   - [ ] Sort by multiple fields
   - [x] One level joins
