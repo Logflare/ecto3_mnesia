@@ -6,6 +6,7 @@ defmodule Ecto.Adapters.Mnesia.SchemaIntegrationTest do
 
   @table_name __MODULE__.Table
   @binary_id_table_name __MODULE__.BinaryIdTable
+  @without_primary_key_table_name __MODULE__.WithoutPrimaryKeyTestSchema
 
   defmodule TestSchema do
     use Ecto.Schema
@@ -38,6 +39,22 @@ defmodule Ecto.Adapters.Mnesia.SchemaIntegrationTest do
     end
   end
 
+  defmodule WithoutPrimaryKeyTestSchema do
+    use Ecto.Schema
+
+    @primary_key false
+    schema "#{Ecto.Adapters.Mnesia.SchemaIntegrationTest.WithoutPrimaryKeyTestSchema}" do
+      timestamps()
+
+      field :field, :string
+    end
+
+    def changeset(%TestSchema{} = struct, params) do
+      struct
+      |> Ecto.Changeset.cast(params, [:field])
+    end
+  end
+
   setup_all do
     ExUnit.CaptureLog.capture_log fn -> Mnesia.storage_up(nodes: [node()]) end
     Mnesia.ensure_all_started([], :permanent)
@@ -54,6 +71,13 @@ defmodule Ecto.Adapters.Mnesia.SchemaIntegrationTest do
       ram_copies: [node()],
       record_name: BinaryIdTestSchema,
       attributes: [:id, :field, :inserted_at, :updated_at],
+      storage_properties: [ ets: [:compressed] ],
+      type: :ordered_set
+    ])
+    :mnesia.create_table(@without_primary_key_table_name, [
+      ram_copies: [node()],
+      record_name: WithoutPrimaryKeyTestSchema,
+      attributes: [:field, :inserted_at, :updated_at],
       storage_properties: [ ets: [:compressed] ],
       type: :ordered_set
     ])
@@ -142,6 +166,22 @@ defmodule Ecto.Adapters.Mnesia.SchemaIntegrationTest do
       :mnesia.clear_table(@binary_id_table_name)
     end
 
+    test "Repo#insert valid record without primary key" do
+      case TestRepo.insert(%WithoutPrimaryKeyTestSchema{field: "field"}) do
+        {:ok, %{field: field}} ->
+          assert true
+
+
+          {:atomic, [{_, field, _, _}]} = :mnesia.transaction(fn ->
+            :mnesia.read(@without_primary_key_table_name, field)
+          end)
+          assert field == "field"
+        _ -> assert false
+      end
+
+      :mnesia.clear_table(@without_primary_key_table_name)
+    end
+
     test "Repo#insert valid record with returning opt" do
       case TestRepo.insert(%TestSchema{field: "field"}, returning: [:id, :field]) do
         {:ok, %{id: id, field: "field"}} ->
@@ -218,18 +258,36 @@ defmodule Ecto.Adapters.Mnesia.SchemaIntegrationTest do
           assert count == 2
           assert length(records) == 2
 
-          Enum.map(records, fn
-            (%{id: id, field: "field 1"}) ->
-              assert TestRepo.get!(BinaryIdTestSchema, id)
-              assert id =~ ~r([0-9a-fA-F]{8}\-[0-9a-fA-F]{4}\-[0-9a-fA-F]{4}\-[0-9a-fA-F]{4}\-[0-9a-fA-F]{12})
-            (%{id: id, field: "field 2"}) ->
-              assert TestRepo.get!(BinaryIdTestSchema, id)
-              assert id =~ ~r([0-9a-fA-F]{8}\-[0-9a-fA-F]{4}\-[0-9a-fA-F]{4}\-[0-9a-fA-F]{4}\-[0-9a-fA-F]{12})
+          {:atomic, results} = :mnesia.transaction(fn ->
+            :mnesia.foldl(fn (record, acc) -> [record|acc] end, [], @binary_id_table_name)
           end)
+
+          assert length(results) == 2
         _ -> assert false
       end
 
-      :mnesia.clear_table(@table_name)
+      :mnesia.clear_table(@binary_id_table_name)
+    end
+
+    test "Repo#insert_all valid records without primary key returning opt" do
+      case TestRepo.insert_all(
+        WithoutPrimaryKeyTestSchema,
+        [%{field: "field 1"}, %{field: "field 2"}],
+        returning: [:field]
+      ) do
+        {count, records} ->
+          assert count == 2
+          assert length(records) == 2
+
+          {:atomic, results} = :mnesia.transaction(fn ->
+            :mnesia.foldl(fn (record, acc) -> [record|acc] end, [], @without_primary_key_table_name)
+          end)
+
+          assert length(results) == 2
+        _ -> assert false
+      end
+
+      :mnesia.clear_table(@without_primary_key_table_name)
     end
   end
 

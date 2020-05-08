@@ -27,7 +27,8 @@ defmodule Ecto.Adapters.Mnesia.Record do
   def build(params, context) do
     table_name = context[:table_name]
     schema = context[:schema]
-    {key, _source, type} = context[:autogenerate_id]
+
+    {key, _source, type} = context[:autogenerate_id] || {nil, nil, nil}
 
     attributes(table_name)
     |> Enum.map(fn
