@@ -93,7 +93,6 @@ defmodule Ecto.Adapters.Mnesia do
   alias Ecto.Adapters.Mnesia
   alias Ecto.Adapters.Mnesia.Connection
   alias Ecto.Adapters.Mnesia.Record
-  alias Ecto.Adapters.Mnesia.Table
 
   require Logger
 

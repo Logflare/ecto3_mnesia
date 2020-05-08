@@ -80,9 +80,6 @@ defmodule Ecto.Adapters.Mnesia.Record do
 
   defmodule Attributes do
     @moduledoc false
-    import Ecto.Adapters.Mnesia.Table, only: [
-      record_field_index: 2,
-    ]
 
     @type t :: list()
 

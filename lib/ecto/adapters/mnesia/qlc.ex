@@ -2,8 +2,8 @@ defmodule Ecto.Adapters.Mnesia.Qlc do
   @moduledoc false
   require Qlc
 
-  alias Ecto.Adapters.Mnesia.Table
   alias Ecto.Adapters.Mnesia.Record
+  alias Ecto.Adapters.Mnesia.Table
   alias Ecto.Query.BooleanExpr
   alias Ecto.Query.QueryExpr
   alias Ecto.Query.SelectExpr
@@ -74,17 +74,17 @@ defmodule Ecto.Adapters.Mnesia.Qlc do
     end
   end
 
-  defp unbind_limit(nil, context), do: :all_remaining
+  defp unbind_limit(nil, _context), do: :all_remaining
   defp unbind_limit(%QueryExpr{expr:  {:^, [], [param_index]}}, context) do
     Enum.at(context[:params], param_index)
   end
-  defp unbind_limit(%QueryExpr{expr:  limit}, context) when is_integer(limit), do: limit
+  defp unbind_limit(%QueryExpr{expr:  limit}, _context) when is_integer(limit), do: limit
 
-  defp unbind_offset(nil, context), do: false
+  defp unbind_offset(nil, _context), do: false
   defp unbind_offset(%QueryExpr{expr:  {:^, [], [param_index]}}, context) do
     Enum.at(context[:params], param_index)
   end
-  defp unbind_offset(%QueryExpr{expr:  offset}, context) when is_integer(offset), do: offset
+  defp unbind_offset(%QueryExpr{expr:  offset}, _context) when is_integer(offset), do: offset
 
   defp select(select, sources) do
     fields = fields(select, sources)
