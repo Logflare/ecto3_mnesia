@@ -66,7 +66,7 @@ defmodule Ecto.Adapters.Mnesia.Qlc do
       limit = unbind_limit(limit, context)
       offset = unbind_offset(offset, context)
       cursor = Qlc.cursor(query)
-      if offset do
+      if offset > 0 do
         :qlc.next_answers(cursor.c, offset)
       end
       :qlc.next_answers(cursor.c, limit)
@@ -80,7 +80,7 @@ defmodule Ecto.Adapters.Mnesia.Qlc do
   end
   defp unbind_limit(%QueryExpr{expr:  limit}, _context) when is_integer(limit), do: limit
 
-  defp unbind_offset(nil, _context), do: false
+  defp unbind_offset(nil, _context), do: 0
   defp unbind_offset(%QueryExpr{expr:  {:^, [], [param_index]}}, context) do
     Enum.at(context[:params], param_index)
   end
