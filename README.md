@@ -44,7 +44,7 @@ You can include ecto3_mnesia in your dependencies as follow:
 ```
   defp deps do
     ...
-    {:ecto3_mnesia, "~> 0.1.0"}, # not released yet
+    {:ecto3_mnesia, "~> 0.2.0"},
     ...
   end
 ```
