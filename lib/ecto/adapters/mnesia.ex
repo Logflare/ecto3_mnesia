@@ -155,7 +155,7 @@ defmodule Ecto.Adapters.Mnesia do
 
         {length(result), result}
       {time, {:aborted, error}} ->
-        Logger.debug("QUERY ERROR sources=#{inspect(sources)} type=delete db=#{time}µs #{inspect(error)}")
+        Logger.debug("QUERY ERROR sources=#{inspect(sources)} type=all db=#{time}µs #{inspect(error)}")
 
         {0, []}
     end
@@ -195,7 +195,7 @@ defmodule Ecto.Adapters.Mnesia do
 
         {length(result), result}
       {time, {:aborted, error}} ->
-        Logger.debug("QUERY ERROR sources=#{inspect(sources)} type=delete db=#{time}µs #{inspect(error)}")
+        Logger.debug("QUERY ERROR sources=#{inspect(sources)} type=update_all db=#{time}µs #{inspect(error)}")
 
         {0, nil}
     end
@@ -231,7 +231,7 @@ defmodule Ecto.Adapters.Mnesia do
 
         {length(result), nil}
       {time, {:aborted, error}} ->
-        Logger.debug("QUERY ERROR sources=#{inspect(sources)} type=delete db=#{time}µs #{inspect(error)}")
+        Logger.debug("QUERY ERROR sources=#{inspect(sources)} type=delete_all db=#{time}µs #{inspect(error)}")
 
         {0, nil}
     end
@@ -305,7 +305,7 @@ defmodule Ecto.Adapters.Mnesia do
 
         {:ok, result}
       {time, {:aborted, error}} ->
-        Logger.debug("QUERY ERROR source=#{inspect(source)} type=delete db=#{time}µs #{inspect(error)}")
+        Logger.debug("QUERY ERROR source=#{inspect(source)} type=insert db=#{time}µs #{inspect(error)}")
 
         {:invalid, [mnesia: inspect(error)]}
     end
@@ -356,7 +356,7 @@ defmodule Ecto.Adapters.Mnesia do
 
         {length(result), result}
       {time, {:aborted, error}} ->
-        Logger.debug("QUERY ERROR source=#{inspect(source)} type=delete db=#{time}µs #{inspect(error)}")
+        Logger.debug("QUERY ERROR source=#{inspect(source)} type=insert_all db=#{time}µs #{inspect(error)}")
 
         {0, nil}
     end
@@ -397,11 +397,11 @@ defmodule Ecto.Adapters.Mnesia do
         {:ok, result}
     else
       {time, {:atomic, []}} ->
-        Logger.debug("QUERY ERROR source=#{inspect(source)} type=delete db=#{time}µs \"No results\"")
+        Logger.debug("QUERY ERROR source=#{inspect(source)} type=update db=#{time}µs \"No results\"")
 
         {:error, :stale}
       {time, {:aborted, error}} ->
-        Logger.debug("QUERY ERROR source=#{inspect(source)} type=delete db=#{time}µs #{inspect(error)}")
+        Logger.debug("QUERY ERROR source=#{inspect(source)} type=update db=#{time}µs #{inspect(error)}")
 
         {:invalid, [mnesia: "#{inspect(error)}"]}
     end
