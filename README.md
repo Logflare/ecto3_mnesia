@@ -93,5 +93,8 @@ mix deps.get
 mix test --trace
 ```
 
+## Thanks
+Many thanks to the contributors of ecto_sql and ecto_mnesia for their work on those topics that have inspired some of the design of this library
+
 ## Contributing
 Contributions of any kind are welcome :)
