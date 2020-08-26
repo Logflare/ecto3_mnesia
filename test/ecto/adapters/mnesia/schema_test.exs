@@ -5,8 +5,9 @@ defmodule Ecto.Adapters.Mnesia.SchemaIntegrationTest do
   alias Ecto.Adapters.Mnesia
 
   @table_name __MODULE__.Table
+  @array_table_name __MODULE__.ArrayTable
   @binary_id_table_name __MODULE__.BinaryIdTable
-  @without_primary_key_table_name __MODULE__.WithoutPrimaryKeyTestSchema
+  @without_primary_key_table_name __MODULE__.WithoutPrimaryKeyTable
 
   defmodule TestSchema do
     use Ecto.Schema
@@ -18,6 +19,21 @@ defmodule Ecto.Adapters.Mnesia.SchemaIntegrationTest do
     end
 
     def changeset(%TestSchema{} = struct, params) do
+      struct
+      |> Ecto.Changeset.cast(params, [:field])
+    end
+  end
+
+  defmodule ArrayTestSchema do
+    use Ecto.Schema
+
+    schema "#{Ecto.Adapters.Mnesia.SchemaIntegrationTest.ArrayTable}" do
+      timestamps()
+
+      field :field, {:array, :string}
+    end
+
+    def changeset(%ArrayTestSchema{} = struct, params) do
       struct
       |> Ecto.Changeset.cast(params, [:field])
     end
@@ -43,7 +59,7 @@ defmodule Ecto.Adapters.Mnesia.SchemaIntegrationTest do
     use Ecto.Schema
 
     @primary_key false
-    schema "#{Ecto.Adapters.Mnesia.SchemaIntegrationTest.WithoutPrimaryKeyTestSchema}" do
+    schema "#{Ecto.Adapters.Mnesia.SchemaIntegrationTest.WithoutPrimaryKeyTable}" do
       timestamps()
 
       field(:field, :string)
@@ -60,21 +76,27 @@ defmodule Ecto.Adapters.Mnesia.SchemaIntegrationTest do
     Mnesia.ensure_all_started([], :permanent)
     {:ok, _repo} = TestRepo.start_link()
 
-    :mnesia.create_table(@table_name,
+    :mnesia.create_table(@table_name, [
       ram_copies: [node()],
       record_name: TestSchema,
       attributes: [:id, :field, :inserted_at, :updated_at],
       storage_properties: [ets: [:compressed]],
       type: :ordered_set
-    )
-
-    :mnesia.create_table(@binary_id_table_name,
+    ])
+    :mnesia.create_table(@array_table_name, [
+      ram_copies: [node()],
+      record_name: ArrayTestSchema,
+      attributes: [:id, :field, :inserted_at, :updated_at],
+      storage_properties: [ ets: [:compressed] ],
+      type: :ordered_set
+    ])
+    :mnesia.create_table(@binary_id_table_name, [
       ram_copies: [node()],
       record_name: BinaryIdTestSchema,
       attributes: [:id, :field, :inserted_at, :updated_at],
       storage_properties: [ets: [:compressed]],
       type: :ordered_set
-    )
+    ])
 
     :mnesia.create_table(@without_primary_key_table_name,
       ram_copies: [node()],
@@ -172,6 +194,23 @@ defmodule Ecto.Adapters.Mnesia.SchemaIntegrationTest do
       end
 
       :mnesia.clear_table(@table_name)
+    end
+
+    test "Repo#insert valid record with array" do
+      array = ["a", "b"]
+      case TestRepo.insert(%ArrayTestSchema{field: array}) do
+        {:ok, %{id: id, field: field}} ->
+          assert true
+
+
+          {:atomic, [{_, id, field, _, _}]} = :mnesia.transaction(fn ->
+            :mnesia.read(@array_table_name, id)
+          end)
+          assert field == array
+        _ -> assert false
+      end
+
+      :mnesia.clear_table(@array_table_name)
     end
 
     test "Repo#insert valid record with binary id" do
@@ -354,7 +393,11 @@ defmodule Ecto.Adapters.Mnesia.SchemaIntegrationTest do
         end)
 
       record = TestRepo.get(TestSchema, 1)
-      {:ok, record: record}
+      {:atomic, _} = :mnesia.transaction(fn ->
+        :mnesia.write(@array_table_name, {ArrayTestSchema, 1, ["a", "b"], nil, nil}, :write)
+      end)
+      array_record = TestRepo.get(ArrayTestSchema, 1)
+      {:ok, array_record: array_record, record: record}
     end
 
     test "Repo#update valid record with [on_conflict: :replace_all]", %{record: record} do
@@ -375,6 +418,25 @@ defmodule Ecto.Adapters.Mnesia.SchemaIntegrationTest do
       end
 
       :mnesia.clear_table(@table_name)
+    end
+
+    test "Repo#update valid record with array field and [on_conflict: :replace_all]", %{array_record: record} do
+      id = record.id
+      update = ["c", "d"]
+      changeset = ArrayTestSchema.changeset(record, %{field: update})
+
+      case TestRepo.update(changeset) do
+        {:ok, %ArrayTestSchema{id: ^id, field: ^update}} ->
+          case :mnesia.transaction(fn ->
+            :mnesia.read(@array_table_name, id)
+          end) do
+            {:atomic, [{ArrayTestSchema, ^id, ^update, _, _}]} -> assert true
+            e -> assert false == e
+          end
+        _ -> assert false
+      end
+
+      :mnesia.clear_table(@array_table_name)
     end
 
     test "Repo#update non existing record with [on_conflict: :replace_all]", %{record: record} do
