@@ -33,3 +33,10 @@ mix.lock
 *.swo
 *.orig
 tags
+**/*.swp
+**/*.swo
+**/*~
+**/.#*
+**/\#*
+**/*~
+Mnesia*

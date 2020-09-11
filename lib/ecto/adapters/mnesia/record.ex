@@ -1,10 +1,11 @@
 defmodule Ecto.Adapters.Mnesia.Record do
   @moduledoc false
-  import Ecto.Adapters.Mnesia.Table, only: [
-    attributes: 1,
-    field_index: 2,
-    field_name: 2
-  ]
+  import Ecto.Adapters.Mnesia.Table,
+    only: [
+      attributes: 1,
+      field_index: 2,
+      field_name: 2
+    ]
 
   alias Ecto.Adapters.Mnesia
 
@@ -14,11 +15,10 @@ defmodule Ecto.Adapters.Mnesia.Record do
   def to_schema(table_name, record) do
     Enum.reduce(
       attributes(table_name),
-      struct(elem(record, 0)), # schema struct
-      fn (attribute, struct) ->
-        %{struct |
-          attribute => elem(record, field_index(attribute, table_name))
-        }
+      # schema struct
+      struct(elem(record, 0)),
+      fn attribute, struct ->
+        %{struct | attribute => elem(record, field_index(attribute, table_name))}
       end
     )
   end
@@ -32,18 +32,21 @@ defmodule Ecto.Adapters.Mnesia.Record do
 
     attributes(table_name)
     |> Enum.map(fn
-      (^key) ->
+      ^key ->
         params[key] ||
           Mnesia.autogenerate(type)
-      (:inserted_at) ->
+
+      :inserted_at ->
+        # TODO Repo#insert_all do not set timestamps, pickup Repo timestamps configuration
         params[:inserted_at] ||
-          # TODO Repo#insert_all do not set timestamps, pickup Repo timestamps configuration
           NaiveDateTime.utc_now()
-      (:updated_at) ->
+
+      :updated_at ->
+        # TODO Repo#insert_all do not set timestamps, pickup Repo timestamps configuration
         params[:updated_at] ||
-          # TODO Repo#insert_all do not set timestamps, pickup Repo timestamps configuration
           NaiveDateTime.utc_now()
-      (attribute) ->
+
+      attribute ->
         case Keyword.fetch(params, attribute) do
           {:ok, value} -> value
           :error -> nil
@@ -62,7 +65,7 @@ defmodule Ecto.Adapters.Mnesia.Record do
     |> Tuple.to_list()
     |> List.delete_at(0)
     |> Enum.with_index()
-    |> Enum.map(fn ({attribute, index}) ->
+    |> Enum.map(fn {attribute, index} ->
       case Keyword.fetch(params, field_name(index, table_name)) do
         {:ok, value} -> value
         :error -> attribute

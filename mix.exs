@@ -10,7 +10,7 @@ defmodule EctoMnesia.MixProject do
       start_permanent: Mix.env() == :prod,
       deps: deps(),
       dialyzer: [
-        plt_add_apps: [:mnesia],
+        plt_add_apps: [:mnesia]
       ],
       source_url: "https://gitlab.com/patatoid/ecto3_mnesia",
       description: description(),
@@ -18,9 +18,14 @@ defmodule EctoMnesia.MixProject do
       docs: [
         main: "Ecto.Adapters.Mnesia",
         extras: ["README.md"]
-      ]
+      ],
+      elixirc_paths: elixirc_paths(Mix.env())
     ]
   end
+
+  defp elixirc_paths(:test), do: ["lib", "test/support"]
+  defp elixirc_paths(:dev), do: ["lib", "lib_support"]
+  defp elixirc_paths(:prod), do: ["lib"]
 
   def application do
     [

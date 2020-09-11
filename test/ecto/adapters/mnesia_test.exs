@@ -8,12 +8,12 @@ defmodule Ecto.Adapters.MnesiaAdapterIntegrationTest do
     use Ecto.Schema
 
     schema "test_schema" do
-      field :field, :string
+      field(:field, :string)
     end
   end
 
   setup do
-    ExUnit.CaptureLog.capture_log fn -> Mnesia.storage_up(nodes: [node()]) end
+    ExUnit.CaptureLog.capture_log(fn -> Mnesia.storage_up(nodes: [node()]) end)
     Mnesia.ensure_all_started([], :permanent)
     :ok
   end
