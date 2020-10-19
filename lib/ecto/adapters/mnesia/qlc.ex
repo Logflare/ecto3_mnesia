@@ -233,6 +233,16 @@ defmodule Ecto.Adapters.Mnesia.Qlc do
   end
 
   defp to_qlc(
+         {:!=, [], [{{:., [], [{:&, [], [source_index]}, field]}, [], []}, value]},
+         context
+       ) do
+    source = Enum.at(context[:sources], source_index)
+    erl_var = Record.Attributes.to_erl_var(field, source)
+    value = to_erl(value)
+    "#{erl_var} =/= #{value}"
+  end
+
+  defp to_qlc(
          {op, [], [{{:., [], [{:&, [], [source_index]}, field]}, [], []}, value]},
          context
        ) do
