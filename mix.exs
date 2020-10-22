@@ -5,7 +5,7 @@ defmodule EctoMnesia.MixProject do
     [
       name: "Ecto3 Mnesia",
       app: :ecto3_mnesia,
-      version: "0.2.1",
+      version: "0.2.2",
       elixir: "~> 1.9",
       start_permanent: Mix.env() == :prod,
       deps: deps(),
