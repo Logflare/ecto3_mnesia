@@ -26,6 +26,8 @@ Mnesia is Distributed Database Management System shipped with Erlang runtime. Be
 - [x] delete/delete_all
 - [x] Auto incremented ids
 - [x] Binary ids
+- [ ] Delete without primary key
+- [ ] Unique constraint
 
 Note: supports only on_conflict: :raise/:update_all
 
