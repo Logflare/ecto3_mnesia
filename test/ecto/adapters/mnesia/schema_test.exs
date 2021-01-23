@@ -198,16 +198,20 @@ defmodule Ecto.Adapters.Mnesia.SchemaIntegrationTest do
 
     test "Repo#insert valid record with array" do
       array = ["a", "b"]
+
       case TestRepo.insert(%ArrayTestSchema{field: array}) do
-        {:ok, %{id: id, field: field}} ->
+        {:ok, %{id: id, field: _field}} ->
           assert true
 
+          {:atomic, [{_, _id, field, _, _}]} =
+            :mnesia.transaction(fn ->
+              :mnesia.read(@array_table_name, id)
+            end)
 
-          {:atomic, [{_, id, field, _, _}]} = :mnesia.transaction(fn ->
-            :mnesia.read(@array_table_name, id)
-          end)
           assert field == array
-        _ -> assert false
+
+        _ ->
+          assert false
       end
 
       :mnesia.clear_table(@array_table_name)

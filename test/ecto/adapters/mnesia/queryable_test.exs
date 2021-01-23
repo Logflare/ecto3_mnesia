@@ -368,6 +368,28 @@ defmodule Ecto.Adapters.MnesiaQueryableIntegrationTest do
       :mnesia.clear_table(@table_name)
     end
 
+    test "#all from one table with negation where query, records" do
+      records = [
+        %TestSchema{id: 1, field: nil},
+        %TestSchema{id: 2, field: "field 2"}
+      ]
+
+      {:atomic, _result} =
+        :mnesia.transaction(fn ->
+          Enum.map(records, fn %{id: id, field: field} ->
+            :mnesia.write(@table_name, {TestSchema, id, field}, :write)
+          end)
+        end)
+
+      assert [record] = TestRepo.all(from(s in TestSchema, where: not is_nil(s.field)))
+      assert record.id == 2
+
+      assert [record] = TestRepo.all(from(s in TestSchema, where: not (s.id in ^[2, 3])))
+      assert record.id == 1
+
+      :mnesia.clear_table(@table_name)
+    end
+
     test "#update_all from one table with simple where query, records" do
       records = [
         %TestSchema{id: 1, field: "field 1"},
