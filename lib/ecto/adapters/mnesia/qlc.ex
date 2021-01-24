@@ -190,6 +190,10 @@ defmodule Ecto.Adapters.Mnesia.Qlc do
     "#{erl_var} == nil"
   end
 
+  defp to_qlc({:not, [], [expr]}, context) do
+    "not (#{to_qlc(expr, context)})"
+  end
+
   defp to_qlc(
          {:in, [],
           [{{:., [], [{:&, [], [source_index]}, field]}, [], []}, {:^, [], [index, length]}]},
