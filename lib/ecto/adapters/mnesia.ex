@@ -156,11 +156,9 @@ defmodule Ecto.Adapters.Mnesia do
         {length(result), result}
 
       {time, {:aborted, error}} ->
-        Logger.debug(
-          "QUERY ERROR sources=#{inspect(sources)} type=all db=#{time}µs #{inspect(error)}"
-        )
+        error = "QUERY ERROR sources=#{inspect(sources)} type=all db=#{time}µs #{inspect(error)}"
 
-        {0, []}
+        error!(nil, error)
     end
   end
 
@@ -200,11 +198,10 @@ defmodule Ecto.Adapters.Mnesia do
         {length(result), result}
 
       {time, {:aborted, error}} ->
-        Logger.debug(
+        error =
           "QUERY ERROR sources=#{inspect(sources)} type=update_all db=#{time}µs #{inspect(error)}"
-        )
 
-        {0, nil}
+        error!(nil, error)
     end
   end
 
@@ -240,11 +237,10 @@ defmodule Ecto.Adapters.Mnesia do
         {length(result), nil}
 
       {time, {:aborted, error}} ->
-        Logger.debug(
+        error =
           "QUERY ERROR sources=#{inspect(sources)} type=delete_all db=#{time}µs #{inspect(error)}"
-        )
 
-        {0, nil}
+        error!(query, error)
     end
   end
 
@@ -265,7 +261,7 @@ defmodule Ecto.Adapters.Mnesia do
         result
 
       _ ->
-        []
+        error!(query, "stream error")
     end
   end
 
@@ -386,11 +382,10 @@ defmodule Ecto.Adapters.Mnesia do
         {length(result), result}
 
       {time, {:aborted, error}} ->
-        Logger.debug(
+        error =
           "QUERY ERROR source=#{inspect(source)} type=insert_all db=#{time}µs #{inspect(error)}"
-        )
 
-        {0, nil}
+        error!(nil, error)
     end
   end
 
@@ -561,5 +556,13 @@ defmodule Ecto.Adapters.Mnesia do
       true -> :up
       false -> :down
     end
+  end
+
+  defp error!(nil, message) do
+    raise ArgumentError, message
+  end
+
+  defp error!(query, message) do
+    raise Ecto.QueryError, query: query, message: message
   end
 end
