@@ -10,6 +10,7 @@ defmodule Ecto.Adapters.Mnesia.Query do
   require Qlc
 
   defstruct type: nil,
+            codepath: nil,
             sources: nil,
             query: nil,
             sort: nil,
@@ -17,6 +18,7 @@ defmodule Ecto.Adapters.Mnesia.Query do
             new_record: nil
 
   @type t :: %__MODULE__{
+          codepath: :qlc | :read,
           type: :all | :update_all | :delete_all,
           sources: Keyword.t(),
           query: (params :: list() -> query_handle :: :qlc.query_handle()),
@@ -24,6 +26,44 @@ defmodule Ecto.Adapters.Mnesia.Query do
           answers: (query_handle :: :qlc.query_handle(), context :: Keyword.t() -> list(tuple())),
           new_record: (tuple(), list() -> tuple())
         }
+
+  @simple_get_by_id_query_where %Ecto.Query.BooleanExpr{
+    expr: {:==, [], [{{:., [], [{:&, [], [0]}, :id]}, [], []}, {:^, [], [0]}]},
+    op: :and,
+    params: nil,
+    subqueries: []
+  }
+
+  alias Ecto.Query.BooleanExpr
+  alias Ecto.Query.QueryExpr
+  alias Ecto.Query.SelectExpr
+
+  @spec from_ecto_query(type :: atom(), ecto_query :: Ecto.Query.t()) :: mnesia_query :: t()
+  def from_ecto_query(
+        type,
+        %Ecto.Query{
+          select: select,
+          joins: [] = joins,
+          sources: sources,
+          wheres: [@simple_get_by_id_query_where] = wheres,
+          updates: [] = updates,
+          order_bys: [] = order_bys,
+          limit: nil = limit,
+          offset: nil = offset
+        } = ectoq
+      ) do
+    {{table, schema, nil}} = sources
+    context = %{sources: sources}
+
+    query = Mnesia.Read.query(select, joins, sources, wheres)
+
+    %Mnesia.Query{
+      type: type,
+      query: query,
+      sources: sources,
+      codepath: :read
+    }
+  end
 
   @spec from_ecto_query(type :: atom(), ecto_query :: Ecto.Query.t()) ::
           mnesia_query :: t()
@@ -52,7 +92,8 @@ defmodule Ecto.Adapters.Mnesia.Query do
       query: query,
       sort: sort,
       answers: answers,
-      new_record: new_record
+      new_record: new_record,
+      codepath: :qlc
     }
   end
 
