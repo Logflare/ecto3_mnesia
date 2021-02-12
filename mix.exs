@@ -38,7 +38,8 @@ defmodule EctoMnesia.MixProject do
       {:ecto, "~> 3.0"},
       {:qlc, "~> 1.0"},
       {:ex_doc, "~> 0.21", only: :dev, runtime: false},
-      {:dialyxir, "~> 1.0.0-rc.7", only: [:dev], runtime: false}
+      {:dialyxir, "~> 1.0.0-rc.7", only: [:dev], runtime: false},
+      {:mix_test_watch, "~> 1.0", only: [:dev], runtime: false}
     ]
   end
 
