@@ -131,6 +131,44 @@ defmodule Ecto.Adapters.Mnesia do
         _query_meta,
         {:nocache,
          %Mnesia.Query{
+           codepath: :read,
+           type: :all,
+           query: query,
+           sources: sources
+         }},
+        params,
+        _opts
+      ) do
+    context = [params: params]
+
+    case :timer.tc(:mnesia, :transaction, [
+           fn ->
+             query.(params)
+             |> Enum.map(fn tuple ->
+               tuple
+               |> Tuple.delete_at(0)
+               |> Tuple.to_list()
+             end)
+           end
+         ]) do
+      {time, {:atomic, result}} ->
+        Logger.debug("QUERY OK sources=#{inspect(sources)} type=all db=#{time}µs")
+
+        {length(result), result}
+
+      {time, {:aborted, error}} ->
+        error = "QUERY ERROR sources=#{inspect(sources)} type=all db=#{time}µs #{inspect(error)}"
+
+        error!(nil, error)
+    end
+  end
+
+  @impl Ecto.Adapter.Queryable
+  def execute(
+        _adapter_meta,
+        _query_meta,
+        {:nocache,
+         %Mnesia.Query{
            type: :all,
            sources: sources,
            query: query,

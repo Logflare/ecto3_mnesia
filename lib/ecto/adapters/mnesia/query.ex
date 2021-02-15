@@ -27,33 +27,64 @@ defmodule Ecto.Adapters.Mnesia.Query do
           new_record: (tuple(), list() -> tuple())
         }
 
-  @simple_get_by_id_query_where %Ecto.Query.BooleanExpr{
-    expr: {:==, [], [{{:., [], [{:&, [], [0]}, :id]}, [], []}, {:^, [], [0]}]},
-    op: :and,
-    params: nil,
-    subqueries: []
-  }
-
   alias Ecto.Query.BooleanExpr
   alias Ecto.Query.QueryExpr
   alias Ecto.Query.SelectExpr
 
   @spec from_ecto_query(type :: atom(), ecto_query :: Ecto.Query.t()) :: mnesia_query :: t()
-  def from_ecto_query(
-        type,
-        %Ecto.Query{
-          select: select,
-          joins: [] = joins,
-          sources: sources,
-          wheres: [@simple_get_by_id_query_where] = wheres,
-          updates: [] = updates,
-          order_bys: [] = order_bys,
-          limit: nil = limit,
-          offset: nil = offset
-        } = ectoq
-      ) do
+  def from_ecto_query(type, ecto_query) do
+    cond do
+      is_simple_ecto_where_expr?(ecto_query) -> do_from_ecto_query(type, ecto_query, :read)
+      true -> do_from_ecto_query(type, ecto_query)
+    end
+  end
+
+  defp is_simple_ecto_where_expr?(%Ecto.Query{wheres: [where], order_bys: nil}) do
+    %Ecto.Query.BooleanExpr{
+      expr: expr,
+      op: :and,
+      params: nil,
+      subqueries: []
+    } = where
+
+    match_simple_where_expr?(expr, :variant_1) || match_simple_where_expr?(expr, :variant_2)
+  end
+
+  defp is_simple_ecto_where_expr?(_), do: false
+
+  defp match_simple_where_expr?(expr, :variant_1) do
+    match?(
+      {:==, [], [{{:., [], [{:&, [], [0], field}]}, [], []}, {:^, [], [0]}]} when is_atom(field),
+      expr
+    )
+  end
+
+  defp match_simple_where_expr?(expr, :variant_2) do
+    match?(
+      {:==, [], [{{:., [], [{:&, [], [0]}, field]}, [], []}, {:^, [], [0]}]}
+      when is_atom(field),
+      expr
+    )
+  end
+
+  @spec from_ecto_query(type :: atom(), ecto_query :: Ecto.Query.t()) :: mnesia_query :: t()
+  defp do_from_ecto_query(
+         type,
+         %Ecto.Query{
+           select: select,
+           joins: [] = joins,
+           sources: sources,
+           wheres: wheres,
+           updates: [] = updates,
+           order_bys: [] = order_bys,
+           limit: nil = limit,
+           offset: nil = offset
+         } = eq,
+         :read
+       ) do
     {{table, schema, nil}} = sources
     context = %{sources: sources}
+    sources = sources(sources)
 
     query = Mnesia.Read.query(select, joins, sources, wheres)
 
@@ -67,19 +98,19 @@ defmodule Ecto.Adapters.Mnesia.Query do
 
   @spec from_ecto_query(type :: atom(), ecto_query :: Ecto.Query.t()) ::
           mnesia_query :: t()
-  def from_ecto_query(
-        type,
-        %Ecto.Query{
-          select: select,
-          joins: joins,
-          sources: sources,
-          wheres: wheres,
-          updates: updates,
-          order_bys: order_bys,
-          limit: limit,
-          offset: offset
-        }
-      ) do
+  defp do_from_ecto_query(
+         type,
+         %Ecto.Query{
+           select: select,
+           joins: joins,
+           sources: sources,
+           wheres: wheres,
+           updates: updates,
+           order_bys: order_bys,
+           limit: limit,
+           offset: offset
+         }
+       ) do
     sources = sources(sources)
     query = Mnesia.Qlc.query(select, joins, sources).(wheres)
     sort = Mnesia.Qlc.sort(order_bys, select, sources)

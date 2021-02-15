@@ -35,7 +35,7 @@ defmodule Ecto.Adapters.Mnesia.Read do
          {:==, [], [{{:., [], [{:&, [], [source_index]}, field]}, [], []}, value]},
          %{sources: sources, params: params}
        ) do
-    {source, schema, _} = elem(sources, source_index)
-    :mnesia.read(String.to_existing_atom(source), value)
+    [{source, schema}] = sources
+    :mnesia.read(source, value)
   end
 end
