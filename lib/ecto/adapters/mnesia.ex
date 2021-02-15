@@ -134,6 +134,7 @@ defmodule Ecto.Adapters.Mnesia do
            codepath: :read,
            type: :all,
            query: query,
+           sort: sort_fn,
            sources: sources
          }},
         params,
@@ -149,6 +150,7 @@ defmodule Ecto.Adapters.Mnesia do
                |> Tuple.delete_at(0)
                |> Tuple.to_list()
              end)
+             |> sort_fn.()
            end
          ]) do
       {time, {:atomic, result}} ->

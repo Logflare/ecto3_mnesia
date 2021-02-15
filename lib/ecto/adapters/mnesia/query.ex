@@ -82,15 +82,29 @@ defmodule Ecto.Adapters.Mnesia.Query do
          } = eq,
          :read
        ) do
-    {{table, schema, nil}} = sources
-    context = %{sources: sources}
     sources = sources(sources)
+    [{table, _schema}] = sources
 
-    query = Mnesia.Read.query(select, joins, sources, wheres)
+    queryfn = Mnesia.Read.query(select, joins, sources, wheres)
+
+    sort = fn queryfn_result ->
+      fields_in_correct_order = for {{_, _, [_, field]}, _, _} <- select.fields, do: field
+      attributes = :mnesia.table_info(table, :attributes)
+
+      queryfn_result
+      |> Enum.map(&Enum.zip(attributes, &1))
+      |> Enum.map(fn kv_list ->
+        Enum.sort_by(kv_list, fn {k, _} ->
+          Enum.find_index(fields_in_correct_order, &(&1 == k))
+        end)
+      end)
+      |> Enum.map(fn kv_list -> Enum.map(kv_list, fn {_, v} -> v end) end)
+    end
 
     %Mnesia.Query{
       type: type,
-      query: query,
+      query: queryfn,
+      sort: sort,
       sources: sources,
       codepath: :read
     }
