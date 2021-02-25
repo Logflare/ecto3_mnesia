@@ -111,7 +111,35 @@ defmodule Ecto.Adapters.MnesiaQueryableIntegrationTest do
       :mnesia.clear_table(@table_name)
     end
 
-    test "#one from one table with simple where query, records" do
+    test "#get from one table by field with index, records" do
+      records = [
+        %TestSchema{id: 1, field: "field 1"},
+        %TestSchema{id: 2, field: "field 2"}
+      ]
+
+      {:atomic, _result} =
+        :mnesia.transaction(fn ->
+          Enum.map(records, fn %{id: id, field: field} ->
+            :mnesia.write(@table_name, {TestSchema, id, field}, :write)
+          end)
+        end)
+
+      :mnesia.del_table_index(@table_name, :field)
+      {:atomic, :ok} = :mnesia.add_table_index(@table_name, :field)
+
+      case TestRepo.get_by(TestSchema, field: "field 1") do
+        %TestSchema{id: 1, field: "field 1"} ->
+          assert true
+
+        e ->
+          assert e == false
+      end
+
+      :mnesia.del_table_index(@table_name, :field)
+      :mnesia.clear_table(@table_name)
+    end
+
+    test "#get from one table by id, records" do
       records = [
         %TestSchema{id: 1, field: "field 1"},
         %TestSchema{id: 2, field: "field 2"}

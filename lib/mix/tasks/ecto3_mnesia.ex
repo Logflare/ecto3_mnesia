@@ -3,11 +3,11 @@ defmodule DummyRepo do
     otp_app: :ecto3_mnesia,
     adapter: Ecto.Adapters.Mnesia
 end
-  
+
 defmodule Mix.Tasks.Ecto3Mnesia do
   defp start_mnesia(repos) do
     Application.ensure_all_started(:ecto3_mnesia)
-    Enum.each(repos, &(&1.start_link()))
+    Enum.each(repos, & &1.start_link())
     :ok
   end
 
@@ -49,15 +49,18 @@ defmodule Mix.Tasks.Ecto3Mnesia do
   end
 
   def run(["gen", schema_name | opts]) do
-    {parsed_opts, _, _} = OptionParser.parse(opts, strict: [table_type: :string], aliases: [t: :table_type])
+    {parsed_opts, _, _} =
+      OptionParser.parse(opts, strict: [table_type: :string], aliases: [t: :table_type])
+
     table_type = Keyword.get(parsed_opts, :table_type, :set)
     schema = String.to_atom("Elixir.#{schema_name}")
 
     case Application.fetch_env(Ecto3Mnesia, :mig_dir) do
       {:ok, mig_dir} ->
         generate_migration(schema, table_type, mig_dir)
+
       :error ->
-        generate_migration(schema, table_type, migration_dir_not_set() )
+        generate_migration(schema, table_type, migration_dir_not_set())
     end
   end
 
@@ -72,23 +75,24 @@ defmodule Mix.Tasks.Ecto3Mnesia do
   defp validate_table_type(table_type) when table_type in ~w(set ordered_set bag), do: :ok
   defp validate_table_type(_), do: {:error, :invalid_table_type}
 
-  defp generate_migration(schema,table_type,mig_dir) do
+  defp generate_migration(schema, table_type, mig_dir) do
     with {:module, module} <- Code.ensure_loaded(schema),
          :ok <- validate_table_type(table_type),
          :ok <- validate_schema(module) do
       table_name = schema.__schema__(:source)
       fields = schema.__schema__(:fields)
-      nodes = Application.get_env(Ecto3Mnesia, :nodes, [node()] )
-      
-      migration = File.read!( Path.join(:code.priv_dir(:ecto3_mnesia),"migration_template.exs") )
-      |> String.replace("FIELDS", "#{inspect fields}")
-      |> String.replace("SCHEMA_NAME", "#{inspect schema}")
-      |> String.replace("TABLE_NAME", ":#{table_name}")
-      |> String.replace("TABLE_TYPE", ":#{table_type}")
-      |> String.replace("NODES", "#{inspect nodes}")
-      
-      File.mkdir_p!(mig_dir)      
-      migration_path = Path.join(mig_dir, "create_#{table_name}.exs") 
+      nodes = Application.get_env(Ecto3Mnesia, :nodes, [node()])
+
+      migration =
+        File.read!(Path.join(:code.priv_dir(:ecto3_mnesia), "migration_template.exs"))
+        |> String.replace("FIELDS", "#{inspect(fields)}")
+        |> String.replace("SCHEMA_NAME", "#{inspect(schema)}")
+        |> String.replace("TABLE_NAME", ":#{table_name}")
+        |> String.replace("TABLE_TYPE", ":#{table_type}")
+        |> String.replace("NODES", "#{inspect(nodes)}")
+
+      File.mkdir_p!(mig_dir)
+      migration_path = Path.join(mig_dir, "create_#{table_name}.exs")
       File.write(migration_path, migration)
     else
       {:error, error} ->

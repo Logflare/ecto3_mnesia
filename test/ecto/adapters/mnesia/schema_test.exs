@@ -30,7 +30,7 @@ defmodule Ecto.Adapters.Mnesia.SchemaIntegrationTest do
     schema "#{Ecto.Adapters.Mnesia.SchemaIntegrationTest.ArrayTable}" do
       timestamps()
 
-      field :field, {:array, :string}
+      field(:field, {:array, :string})
     end
 
     def changeset(%ArrayTestSchema{} = struct, params) do
@@ -76,27 +76,29 @@ defmodule Ecto.Adapters.Mnesia.SchemaIntegrationTest do
     Mnesia.ensure_all_started([], :permanent)
     {:ok, _repo} = TestRepo.start_link()
 
-    :mnesia.create_table(@table_name, [
+    :mnesia.create_table(@table_name,
       ram_copies: [node()],
       record_name: TestSchema,
       attributes: [:id, :field, :inserted_at, :updated_at],
       storage_properties: [ets: [:compressed]],
       type: :ordered_set
-    ])
-    :mnesia.create_table(@array_table_name, [
+    )
+
+    :mnesia.create_table(@array_table_name,
       ram_copies: [node()],
       record_name: ArrayTestSchema,
       attributes: [:id, :field, :inserted_at, :updated_at],
-      storage_properties: [ ets: [:compressed] ],
+      storage_properties: [ets: [:compressed]],
       type: :ordered_set
-    ])
-    :mnesia.create_table(@binary_id_table_name, [
+    )
+
+    :mnesia.create_table(@binary_id_table_name,
       ram_copies: [node()],
       record_name: BinaryIdTestSchema,
       attributes: [:id, :field, :inserted_at, :updated_at],
       storage_properties: [ets: [:compressed]],
       type: :ordered_set
-    ])
+    )
 
     :mnesia.create_table(@without_primary_key_table_name,
       ram_copies: [node()],
@@ -397,9 +399,12 @@ defmodule Ecto.Adapters.Mnesia.SchemaIntegrationTest do
         end)
 
       record = TestRepo.get(TestSchema, 1)
-      {:atomic, _} = :mnesia.transaction(fn ->
-        :mnesia.write(@array_table_name, {ArrayTestSchema, 1, ["a", "b"], nil, nil}, :write)
-      end)
+
+      {:atomic, _} =
+        :mnesia.transaction(fn ->
+          :mnesia.write(@array_table_name, {ArrayTestSchema, 1, ["a", "b"], nil, nil}, :write)
+        end)
+
       array_record = TestRepo.get(ArrayTestSchema, 1)
       {:ok, array_record: array_record, record: record}
     end
@@ -424,7 +429,10 @@ defmodule Ecto.Adapters.Mnesia.SchemaIntegrationTest do
       :mnesia.clear_table(@table_name)
     end
 
-    test "Repo#update valid record with array field and [on_conflict: :replace_all]", %{array_record: record} do
+    @tag :this
+    test "Repo#update valid record with array field and [on_conflict: :replace_all]", %{
+      array_record: record
+    } do
       id = record.id
       update = ["c", "d"]
       changeset = ArrayTestSchema.changeset(record, %{field: update})
@@ -432,12 +440,14 @@ defmodule Ecto.Adapters.Mnesia.SchemaIntegrationTest do
       case TestRepo.update(changeset) do
         {:ok, %ArrayTestSchema{id: ^id, field: ^update}} ->
           case :mnesia.transaction(fn ->
-            :mnesia.read(@array_table_name, id)
-          end) do
+                 :mnesia.read(@array_table_name, id)
+               end) do
             {:atomic, [{ArrayTestSchema, ^id, ^update, _, _}]} -> assert true
             e -> assert false == e
           end
-        _ -> assert false
+
+        _ ->
+          assert false
       end
 
       :mnesia.clear_table(@array_table_name)

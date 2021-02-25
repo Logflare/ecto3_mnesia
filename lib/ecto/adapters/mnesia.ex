@@ -147,6 +147,7 @@ defmodule Ecto.Adapters.Mnesia do
              query.(params)
              |> Enum.map(fn tuple ->
                tuple
+               # removes the Erl named part of the name tuple of mnesia returns
                |> Tuple.delete_at(0)
                |> Tuple.to_list()
              end)

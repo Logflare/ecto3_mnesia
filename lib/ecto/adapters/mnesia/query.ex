@@ -34,37 +34,77 @@ defmodule Ecto.Adapters.Mnesia.Query do
   @spec from_ecto_query(type :: atom(), ecto_query :: Ecto.Query.t()) :: mnesia_query :: t()
   def from_ecto_query(type, ecto_query) do
     cond do
-      is_simple_ecto_where_expr?(ecto_query) -> do_from_ecto_query(type, ecto_query, :read)
-      true -> do_from_ecto_query(type, ecto_query)
+      is_simple_ecto_where_expr?(ecto_query) and match_simple_where_expr?(ecto_query, :id) ->
+        do_from_ecto_query(type, ecto_query, :read)
+
+      is_simple_ecto_where_expr?(ecto_query) and
+        match_simple_where_expr?(ecto_query, :non_id_field) and index_exists?(ecto_query) ->
+        do_from_ecto_query(type, ecto_query, :index_read)
+
+      true ->
+        do_from_ecto_query(type, ecto_query)
     end
   end
 
-  defp is_simple_ecto_where_expr?(%Ecto.Query{wheres: [where], order_bys: nil}) do
-    %Ecto.Query.BooleanExpr{
-      expr: expr,
-      op: :and,
-      params: nil,
-      subqueries: []
-    } = where
-
-    match_simple_where_expr?(expr, :variant_1) || match_simple_where_expr?(expr, :variant_2)
+  defp is_simple_ecto_where_expr?(%Ecto.Query{
+         select: %SelectExpr{expr: {:&, [], [0]}},
+         wheres: [where],
+         order_bys: []
+       }) do
+    match?(
+      %Ecto.Query.BooleanExpr{
+        expr: expr,
+        op: :and,
+        params: nil,
+        subqueries: []
+      },
+      where
+    )
   end
 
   defp is_simple_ecto_where_expr?(_), do: false
 
-  defp match_simple_where_expr?(expr, :variant_1) do
+  defp match_simple_where_expr?(%{wheres: [%{expr: expr}]}, :id) do
     match?(
-      {:==, [], [{{:., [], [{:&, [], [0], field}]}, [], []}, {:^, [], [0]}]} when is_atom(field),
+      {:==, [], [{{:., [], [{:&, [], [0], field}]}, [], []}, {:^, [], [0]}]} when field == :id,
+      expr
+    ) or
+      match?(
+        {:==, [], [{{:., [], [{:&, [], [0]}, field]}, [], []}, {:^, [], [0]}]} when field == :id,
+        expr
+      )
+  end
+
+  defp match_simple_where_expr?(%{wheres: [%{expr: expr}]}, :non_id_field) do
+    match?(
+      {:==, [], [{{:., [], [{:&, [], [0]}, field]}, [], []}, {:^, [], [0]}]}
+      when field != :id,
       expr
     )
   end
 
-  defp match_simple_where_expr?(expr, :variant_2) do
-    match?(
-      {:==, [], [{{:., [], [{:&, [], [0]}, field]}, [], []}, {:^, [], [0]}]}
-      when is_atom(field),
-      expr
-    )
+  defp index_exists?(%Ecto.Query{
+         wheres: [where],
+         select: select,
+         sources: sources
+       }) do
+    fields_in_correct_order = for {{_, _, [_, field]}, _, _} <- select.fields, do: field
+    field = get_field(where.expr)
+    [{tab, _schema}] = sources(sources)
+
+    index_exists?(tab, field)
+  end
+
+  defp get_field({:==, [], [{{:., [], [{:&, [], [0]}, field]}, [], []}, {:^, [], [0]}]}) do
+    field
+  end
+
+  defp index_exists?(table, field) when is_atom(field) and is_atom(table) do
+    attrs = :mnesia.table_info(table, :attributes)
+    field_pos = Enum.find_index(attrs, &(&1 == field))
+
+    index = :mnesia.table_info(table, :index)
+    (field_pos + 2) in index
   end
 
   @spec from_ecto_query(type :: atom(), ecto_query :: Ecto.Query.t()) :: mnesia_query :: t()
@@ -80,8 +120,9 @@ defmodule Ecto.Adapters.Mnesia.Query do
            limit: nil = limit,
            offset: nil = offset
          } = eq,
-         :read
-       ) do
+         codepath
+       )
+       when codepath in [:read, :index_read] do
     sources = sources(sources)
     [{table, _schema}] = sources
 
